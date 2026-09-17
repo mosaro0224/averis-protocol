@@ -1,0 +1,10 @@
+{
+  "name": "averis-protocol",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node api/server.mjs",
+    "test:api": "node --test api/**/*.test.mjs"
+  }
+}

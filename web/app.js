@@ -1,0 +1,3 @@
+const buttons = document.querySelectorAll('.tab');
+buttons.forEach(button => button.addEventListener('click', () => { buttons.forEach(b => b.classList.remove('active')); document.querySelectorAll('.panel').forEach(p => p.classList.remove('active')); button.classList.add('active'); document.getElementById(button.dataset.tab).classList.add('active'); }));
+document.getElementById('connect').addEventListener('click', async () => { if (!window.ethereum) return alert('Install an EIP-1193 wallet to connect.'); try { const [account] = await window.ethereum.request({ method: 'eth_requestAccounts' }); document.getElementById('connect').textContent = `${account.slice(0, 6)}…${account.slice(-4)}`; } catch { alert('Wallet connection was rejected.'); } });
