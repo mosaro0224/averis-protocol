@@ -66,8 +66,10 @@
       "job_budget_usdc": 1000,
       "max_advance_usdc": 200,
       "financing_fee_usdc": 4,
+      "net_advance_to_agent_usdc": 196,
       "total_repayment_usdc": 204,
-      "agent_receives_usdc": 796
+      "settlement_remainder_to_agent_usdc": 796,
+      "note": "Agent receives 196 USDC net at draw (200 minus 4 fee). At job settlement, agent receives 796 USDC (1000 job budget minus 204 repayment)."
     }
   },
 
@@ -178,7 +180,8 @@
       { "name": "averis_get_quote",        "auth": false, "description": "Financing quote: approved amount, fee, repayment, expiry" },
       { "name": "averis_request_funding",  "auth": true,  "description": "Returns draw() calldata for agent to submit on-chain (EIP-712 required)" },
       { "name": "averis_pool_status",      "auth": false, "description": "Pool balance, spent, recipients, expiry, freeze status" },
-      { "name": "averis_position_status",  "auth": false, "description": "Full financing position state and repayment tracking" }
+      { "name": "averis_position_status",  "auth": false, "description": "Full financing position state and repayment tracking" },
+      { "name": "averis_repay",            "auth": true,  "description": "Returns repayObligation() calldata for OBLIGATION-mode positions (EIP-712 required). Coming soon — not yet in tools/list." }
     ]
   },
 

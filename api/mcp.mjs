@@ -126,6 +126,23 @@ export const MCP_TOOLS = [
       required: ["jobId"],
     },
   },
+  {
+    name: "averis_repay",
+    description: "For OBLIGATION-mode financing positions (jobs without on-chain lien), returns the repayObligation() calldata the agent must submit after job settlement to repay principal and fee. Requires EIP-712 auth.",
+    requiresAuth: true,
+    "x-requires-auth": true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        jobId:        { type: "string",  description: "Job ID as a decimal string" },
+        agentAddress: { type: "string",  description: "Agent wallet address (0x...)" },
+        nonce:        { type: "integer", description: "Monotonic nonce (get from /v2/agents/:address)" },
+        expiry:       { type: "integer", description: "Unix timestamp after which signature is invalid" },
+        signature:    { type: "string",  description: "EIP-712 signature over {agentAddress, nonce, expiry, chainId}" },
+      },
+      required: ["jobId", "agentAddress", "nonce", "expiry", "signature"],
+    },
+  },
 ];
 
 // ── Auth verification (reused from server context) ────────────────────────
@@ -353,6 +370,30 @@ export async function handleMCP(req, res, ctx) {
           if (args.jobId === undefined) return res.json(mcpErr("jobId is required"));
           const r = await ctx.fetch(`/v2/positions/${args.jobId}`);
           return res.json(r.ok ? mcpOk(r.data) : mcpErr(r.data?.error || "Failed to fetch position"));
+        }
+
+        case "averis_repay": {
+          if (!args.jobId) return res.json(mcpErr("jobId is required"));
+          if (!ctx) return res.json(mcpOk({
+            instruction: "averis_repay requires a live server context. Call /v2/positions/:jobId to confirm position is in OBLIGATION mode, then call AverisFinancingV2.repayObligation(jobId) from the agent wallet.",
+            repayFunction: "repayObligation(uint256 jobId)",
+            contract: "AverisFinancingV2",
+          }));
+          const pos = await ctx.fetch(`/v2/positions/${args.jobId}`);
+          if (!pos.ok) return res.json(mcpErr("Could not fetch position"));
+          if (pos.data?.mode !== "OBLIGATION") {
+            return res.json(mcpOk({
+              note: "This position uses LIEN mode — repayment is automatic via ReceivableRouter. No manual repayment required.",
+              position: pos.data,
+            }));
+          }
+          return res.json(mcpOk({
+            instruction: "Submit repayObligation() from your agent wallet to repay principal and fee.",
+            contract:    ctx?.contracts?.financing || "AverisFinancingV2",
+            function:    "repayObligation(uint256 jobId)",
+            args:        { jobId: args.jobId },
+            position:    pos.data,
+          }));
         }
 
         default:
