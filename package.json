@@ -2,11 +2,17 @@
   "name": "averis-protocol",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node api/server.mjs",
     "wire": "node scripts/wire.mjs",
     "test:api": "node --test api/**/*.test.mjs",
     "test:discovery": "node --test api/discovery.test.mjs api/mcp.test.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "viem": "^2.28.3"
   }
 }

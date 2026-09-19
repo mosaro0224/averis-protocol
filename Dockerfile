@@ -2,11 +2,11 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dependencies
+# Copy package.json and install dependencies
 COPY package.json ./
-RUN npm install --omit=dev
+RUN npm install
 
-# Copy API source
+# Copy API source and discovery files
 COPY api/ ./api/
 
 # Expose port
