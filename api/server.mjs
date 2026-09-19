@@ -661,7 +661,77 @@ async function internalFetch(method, path, body) {
   });
 }
 
-function buildDiscoveryDoc() {
+// Cache live protocol params, refreshed every 60s
+let _liveParams = null;
+let _liveParamsTs = 0;
+async function getLiveParams() {
+  const now = Date.now();
+  if (_liveParams && now - _liveParamsTs < 60_000) return _liveParams;
+  try {
+    const [advBps, feeBps, protMax, perAgent, tvl, avail, outstanding] = await Promise.all([
+      readContract(CONTRACTS.financing, FINANCING_ABI, "advanceRateBps"),
+      readContract(CONTRACTS.financing, FINANCING_ABI, "feeBps"),
+      readContract(CONTRACTS.financing, FINANCING_ABI, "protocolMaximum"),
+      readContract(CONTRACTS.hood,      HOOD_ABI,      "maxExposurePerAgent"),
+      readContract(CONTRACTS.vault,     VAULT_ABI,     "totalAssets"),
+      readContract(CONTRACTS.vault,     VAULT_ABI,     "availableLiquidity"),
+      readContract(CONTRACTS.vault,     VAULT_ABI,     "outstandingPrincipal"),
+    ]);
+    const advPct  = Number(advBps)  / 100;
+    const feePct  = Number(feeBps)  / 100;
+    const tvlUsdc = Number(tvl)     / 1e6;
+    const availUsdc = Number(avail) / 1e6;
+    const maxAgent  = Number(perAgent) / 1e6;
+    const maxProto  = Number(protMax)  / 1e6;
+    // worked example at $1000 job
+    const exampleBudget  = 1000;
+    const exampleAdvance = +(exampleBudget * advPct / 100).toFixed(2);
+    const exampleFee     = +(exampleAdvance * feePct / 100).toFixed(2);
+    _liveParams = {
+      advance_rate_pct:    advPct,
+      advance_rate_bps:    Number(advBps),
+      financing_fee_pct:   feePct,
+      financing_fee_bps:   Number(feeBps),
+      max_per_agent_usdc:  maxAgent,
+      protocol_maximum_usdc: maxProto,
+      usdc_decimals: 6,
+      vault: {
+        tvl_usdc:           tvlUsdc,
+        available_usdc:     availUsdc,
+        outstanding_usdc:   Number(outstanding) / 1e6,
+        note: tvlUsdc === 0
+          ? "Vault holds no liquidity yet — LP deposits needed before financing is available."
+          : `${availUsdc.toFixed(2)} USDC available to lend.`,
+      },
+      fee_split: { lp_pct: 70, treasury_pct: 20, reserve_pct: 10 },
+      example: {
+        job_budget_usdc:                  exampleBudget,
+        max_advance_usdc:                 exampleAdvance,
+        financing_fee_usdc:               exampleFee,
+        net_advance_to_agent_usdc:        +(exampleAdvance - exampleFee).toFixed(2),
+        total_repayment_usdc:             +(exampleAdvance + exampleFee).toFixed(2),
+        settlement_remainder_to_agent_usdc: +(exampleBudget - exampleAdvance - exampleFee).toFixed(2),
+        note: `Agent draws ${exampleAdvance} USDC, pays ${exampleFee} USDC fee, receives net ${+(exampleAdvance-exampleFee).toFixed(2)} USDC. At settlement agent keeps ${+(exampleBudget-exampleAdvance-exampleFee).toFixed(2)} USDC.`,
+      },
+      fetched_at: new Date().toISOString(),
+    };
+    _liveParamsTs = now;
+  } catch (_e) {
+    _liveParams = _liveParams || {
+      note: "Could not fetch live params from chain. Using last known values.",
+      advance_rate_pct: 40, financing_fee_pct: 2,
+    };
+  }
+  return _liveParams;
+}
+
+function buildDiscoveryDoc(liveParams) {
+  const terms = liveParams || {
+    advance_rate_pct: 40, advance_rate_bps: 4000,
+    financing_fee_pct: 2, financing_fee_bps: 200,
+    max_per_agent_usdc: 10000, protocol_maximum_usdc: 50000,
+    note: "Live chain read pending.",
+  };
   return {
     protocol:       "Averis",
     version:        "2.0.0",
@@ -673,25 +743,14 @@ function buildDiscoveryDoc() {
     chain:          AGENT_CARD.chain,
     contracts:      CONTRACTS,
     contractsReady: contractsDeployed(),
-    protocol_terms: {
-      note:                   "Live values verified on-chain from AverisFinancingV2.",
-      advance_rate_pct:       20,
-      advance_rate_bps:       2000,
-      financing_fee_pct:      2,
-      financing_fee_bps:      200,
-      max_per_agent_usdc:     10000,
-      max_per_agent_raw:      "10000000000",
-      protocol_maximum_usdc:  50000,
-      protocol_maximum_raw:   "50000000000",
-      usdc_decimals:          6,
-      fee_split: { lp_pct: 70, treasury_pct: 20, reserve_pct: 10 },
-      example: {
-        job_budget_usdc:      1000,
-        max_advance_usdc:     200,
-        financing_fee_usdc:   4,
-        total_repayment_usdc: 204,
-        agent_receives_usdc:  796,
-      },
+    protocol_terms: terms,
+    default_consequences: {
+      note: "What happens to the agent if a financed job fails, expires, or is rejected.",
+      pool_frozen:        "The spending pool is frozen immediately — no further spending possible.",
+      unspent_returned:   "Any unspent capital in the pool is returned to the vault automatically.",
+      net_loss_written_off: "The net loss (principal minus unspent) is written off against vault NAV (LP funds absorb the loss).",
+      agent_consequences: "In V2 there is no on-chain blacklist or automatic reputation penalty for defaults. The agent's exposure is released in AverisHood, allowing future financing applications. However, the protocol owner may manually set the agent's credit limit to zero via setCreditLimit().",
+      agent_liability:    "The agent is NOT personally liable to repay if the job fails. The financing is non-recourse — secured only by the job receivable.",
     },
     eligibility_requirements: AGENT_CARD.eligibility_requirements,
     repayment:      AGENT_CARD.repayment,
@@ -702,14 +761,15 @@ function buildDiscoveryDoc() {
       endpoint: `${AGENT_CARD.api.base_url}/v1/mcp`,
       protocol: "MCP/1.0",
       tools:    MCP_TOOLS.map((t) => ({
-        name:         t.name,
-        description:  t.description,
-        requiresAuth: t.requiresAuth,
+        name:              t.name,
+        description:       t.description,
+        requiresAuth:      t.requiresAuth,
         "x-requires-auth": t.requiresAuth,
       })),
     },
     openapi:   `${AGENT_CARD.api.base_url}/openapi.json`,
     agentCard: `${AGENT_CARD.api.base_url}/.well-known/agent-card.json`,
+    summary:   `${AGENT_CARD.api.base_url}/v1/summary`,
   };
 }
 
@@ -747,9 +807,124 @@ app.get("/robots.txt", (_req, res) => {
 });
 
 // GET /v1/discover — machine-readable capability discovery entry point
-app.get("/v1/discover", (_req, res) => {
+app.get("/v1/discover", async (_req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.json(buildDiscoveryDoc());
+  const liveParams = await getLiveParams();
+  res.json(buildDiscoveryDoc(liveParams));
+});
+
+// GET /v1/summary — plain-text human/agent readable summary (no auth, CORS open)
+// Designed to be readable by AI agents fetching via web_fetch or similar tools.
+app.get("/v1/summary", async (_req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  const p = await getLiveParams();
+  const advPct  = p.advance_rate_pct  ?? 40;
+  const feePct  = p.financing_fee_pct ?? 2;
+  const tvl     = p.vault?.tvl_usdc       ?? 0;
+  const avail   = p.vault?.available_usdc ?? 0;
+  const maxAgent= p.max_per_agent_usdc    ?? 10000;
+  const maxProto= p.protocol_maximum_usdc ?? 50000;
+  const ex      = p.example ?? {};
+  res.send(`
+AVERIS PROTOCOL — Working Capital for Autonomous AI Agents
+==========================================================
+Status:   TESTNET (Arc Testnet, chain 1227)
+Version:  2.0.0
+Website:  https://averisprotocol.netlify.app
+API:      https://averis-protocol-production.up.railway.app
+GitHub:   https://github.com/mosaro0224/averis-protocol
+
+WHAT AVERIS DOES
+----------------
+Averis finances verified agent jobs. An agent with a funded job can draw
+a temporary controlled spending pool to bridge a capital shortfall.
+Principal and fees are repaid automatically from the job receivable at settlement.
+
+FINANCING TERMS (live from chain)
+----------------------------------
+Advance rate:      ${advPct}% of job budget
+Financing fee:     ${feePct}% of advance (flat, not annualized)
+Max per agent:     ${maxAgent.toLocaleString()} USDC
+Protocol maximum:  ${maxProto.toLocaleString()} USDC
+Fee split:         70% to LPs, 20% to treasury, 10% to reserve
+
+VAULT LIQUIDITY (live from chain)
+-----------------------------------
+Total vault assets:    ${tvl.toFixed(2)} USDC
+Available to lend:     ${avail.toFixed(2)} USDC
+Note: ${p.vault?.note ?? "See /v2/protocol for full vault status."}
+
+WORKED EXAMPLE
+--------------
+Job budget:                 ${ex.job_budget_usdc ?? 1000} USDC
+Maximum advance (${advPct}%):     ${ex.max_advance_usdc ?? (1000*advPct/100)} USDC
+Financing fee (${feePct}%):       ${ex.financing_fee_usdc ?? (1000*advPct/100*feePct/100)} USDC
+Net to agent at draw:       ${ex.net_advance_to_agent_usdc ?? (1000*advPct/100*(1-feePct/100))} USDC
+Total repayment:            ${ex.total_repayment_usdc ?? (1000*advPct/100*(1+feePct/100))} USDC
+Agent keeps at settlement:  ${ex.settlement_remainder_to_agent_usdc ?? (1000-1000*advPct/100*(1+feePct/100))} USDC
+
+ELIGIBILITY REQUIREMENTS
+-------------------------
+1. Job must exist in a registered adapter protocol (AverisACP or ERC-8183 compatible)
+2. Job must be funded and active (status: FUNDED)
+3. Caller must be the job provider/agent address
+4. Job payout receiver must be set to AverisReceivableRouter before funding
+5. Job must not have expired
+6. Job must not already have an active financing position
+7. Agent exposure must not exceed per-agent cap (${maxAgent.toLocaleString()} USDC)
+8. Requested amount must not exceed ${advPct}% of job budget
+
+DEFAULT CONSEQUENCES
+---------------------
+- Spending pool is frozen immediately — no further spending possible.
+- Unspent capital is returned to the vault automatically.
+- Net loss is written off against vault NAV (LP funds absorb the loss).
+- Agent is NOT personally liable — financing is non-recourse.
+- No automatic blacklist in V2. Owner may manually restrict future credit.
+
+HOW TO INTEGRATE
+-----------------
+Step 1: GET  /v1/discover           — capabilities, contracts, auth instructions
+Step 2: GET  /v2/agents/:address    — check your credit profile and available credit
+Step 3: POST /v2/jobs/verify        — confirm your job is eligible
+Step 4: POST /v2/credit/quote       — get financing terms
+Step 5: Submit draw() on-chain      — AverisFinancingV2 creates your spending pool
+Step 6: POST /v2/pools/:pool/spend  — get validated spend() calldata
+Step 7: Settlement automatic        — ReceivableRouter repays principal+fee
+
+MCP TOOLS (POST /v1/mcp)
+-------------------------
+Send: {"method":"tools/list"} to enumerate all ${MCP_TOOLS.length} tools.
+Key tools: averis_discover, averis_check_eligibility, averis_get_quote,
+           averis_request_funding (auth), averis_pool_status, averis_position_status
+
+AUTHENTICATION
+--------------
+Read-only endpoints: no auth required.
+Mutating actions:    EIP-712 signature in X-Agent-Signature header.
+Domain: {name: "AverisProtocol", version: "2", chainId: 1227}
+Type:   AgentRequest{agentAddress, nonce, expiry, chainId}
+
+IMPORTANT NOTES
+---------------
+- TESTNET ONLY. Arc Testnet USDC has no real-world value.
+- Unaudited. Do not use with real funds until third-party audit is completed.
+- Vault currently holds ${tvl.toFixed(2)} USDC. Financing requires LP deposits.
+- Mainnet deployment is on the roadmap after audit and vault seeding.
+
+Contract addresses:
+  AverisVault:           0x0c60e6b789286d8d3815ca4760839b3dc50a2967
+  AverisFinancingV2:     0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f
+  AverisACP:             0x230fb4771e32c5f6f2d157131f7976915fc65248
+  ReceivableRouter:      0x89ff42862307145b92f5c6bf72772140e4bab57a
+  AverisHood:            0xa37135beeb44a9b0a9c59e552d60935f9babcea0
+  AverisPoolFactory:     0xff52e6bc002f3facff0317918bfd7e93525fe7ed
+  AverisAdapterRegistry: 0x5bdaa397a2d24de1e9e6c25f57c475e4c35c2f8b
+  AverisReserve:         0x9a025a6b3c31093fe16d60d7b48e527afb24b357
+
+Generated: ${new Date().toISOString()}
+`.trim());
 });
 
 // POST /v1/mcp — MCP/1.0 tool dispatcher
