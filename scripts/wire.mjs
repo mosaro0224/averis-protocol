@@ -82,7 +82,7 @@ const SET_FINANCING_ABI = parseAbi([
   'function setFinancing(address financing_) external',
 ])
 const REGISTER_ADAPTER_ABI = parseAbi([
-  'function registerAdapter(address protocol, uint8 tier, address adapter, uint64 maxJobs, string calldata name) external',
+  'function registerAdapter(address protocol, uint256 adapterId, address adapter, uint8 tier, string calldata name_) external',
 ])
 const OWNER_ABI = parseAbi([
   'function owner() external view returns (address)',
@@ -193,7 +193,7 @@ await send(
 await send(
   'AverisAdapterRegistry.registerAdapter(acp, NATIVE, acpAdapter)',
   REGISTRY, REGISTER_ADAPTER_ABI, 'registerAdapter',
-  [ACP, 0, ACP_ADAPTER, 100n, 'AverisACP Native']
+  [ACP, 0n, ACP_ADAPTER, 0, 'AverisACP Native']
 )
 
 // ─── post-wire verification ───────────────────────────────────────────────────
