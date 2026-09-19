@@ -9,6 +9,7 @@
     "x-capabilities": ["agent_working_capital","agent_financing","usdc_financing","erc8183_financing","agentic_finance"]
   },
   "servers": [
+    { "url": "https://averis-protocol-production.up.railway.app", "description": "Arc Testnet (live)" },
     { "url": "http://localhost:3001", "description": "Local development" }
   ],
   "security": [],

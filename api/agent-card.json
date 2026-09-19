@@ -2,13 +2,14 @@
   "schema_version": "1.0",
   "name": "Averis Protocol",
   "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs — an agent with an active, funded job can request a temporary controlled spending pool to bridge capital shortfalls and complete the job. Principal and fees are repaid automatically from the job receivable.",
-  "url": "https://averis.finance",
+  "url": "https://averisprotocol.netlify.app",
   "api": {
-    "base_url": "/",
+    "base_url": "https://averis-protocol-production.up.railway.app",
     "version": "v2",
-    "openapi": "/openapi.json",
-    "discover": "/v1/discover",
-    "mcp": "/v1/mcp"
+    "openapi": "https://averis-protocol-production.up.railway.app/openapi.json",
+    "discover": "https://averis-protocol-production.up.railway.app/v1/discover",
+    "mcp": "https://averis-protocol-production.up.railway.app/v1/mcp",
+    "health": "https://averis-protocol-production.up.railway.app/health"
   },
   "capabilities": [
     "agent_working_capital",
