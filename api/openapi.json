@@ -1,0 +1,498 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Averis Protocol API",
+    "version": "2.0.0",
+    "description": "On-chain working-capital API for autonomous AI agents. Agents discover Averis, check eligibility, request financing quotes, and receive controlled spending pools backed by verified job receivables. Principal and fees are repaid automatically at job settlement.",
+    "contact": { "url": "https://x.com/averis_protocol" },
+    "x-agent-facing": true,
+    "x-capabilities": ["agent_working_capital","agent_financing","usdc_financing","erc8183_financing","agentic_finance"]
+  },
+  "servers": [
+    { "url": "http://localhost:3001", "description": "Local development" }
+  ],
+  "security": [],
+  "components": {
+    "securitySchemes": {
+      "AgentEIP712": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Agent-Signature",
+        "description": "EIP-712 signature over {agentAddress, nonce, expiry, chainId} using AverisProtocol domain v2. Also requires agentAddress, nonce, and expiry in the request body."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "detail": { "type": "string" }
+        },
+        "required": ["error"]
+      },
+      "AgentCredit": {
+        "type": "object",
+        "properties": {
+          "limit":         { "type": "string", "description": "Effective credit limit in USDC raw units (6 decimals)" },
+          "used":          { "type": "string", "description": "Currently deployed capital" },
+          "available":     { "type": "string", "description": "Remaining available credit" },
+          "isCustomLimit": { "type": "boolean" }
+        }
+      },
+      "JobView": {
+        "type": "object",
+        "properties": {
+          "client":          { "type": "string" },
+          "provider":        { "type": "string" },
+          "budget":          { "type": "string" },
+          "token":           { "type": "string" },
+          "status":          { "type": "integer", "description": "0=NONE 1=OPEN 2=FUNDED 3=SUBMITTED 4=COMPLETE 5=REJECTED 6=EXPIRED 7=DISPUTED" },
+          "expiry":          { "type": "string" },
+          "payoutReceiver":  { "type": "string" },
+          "descriptionHash": { "type": "string" }
+        }
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "approvedAmount":  { "type": "string" },
+          "fee":             { "type": "string" },
+          "totalRepayment":  { "type": "string" },
+          "feeBps":          { "type": "string" },
+          "advanceRateBps":  { "type": "string" },
+          "maxAvailable":    { "type": "string" }
+        }
+      },
+      "Position": {
+        "type": "object",
+        "properties": {
+          "jobId":           { "type": "string" },
+          "agent":           { "type": "string" },
+          "principal":       { "type": "string" },
+          "fee":             { "type": "string" },
+          "principalRepaid": { "type": "string" },
+          "feeRepaid":       { "type": "string" },
+          "status":          { "type": "string", "enum": ["NONE","ACTIVE","REPAID","DEFAULTED","EXPIRED","PARTIALLY_RECOVERED"] },
+          "expiry":          { "type": "string" },
+          "expiryDate":      { "type": "string", "format": "date-time" },
+          "poolAddress":     { "type": "string" },
+          "mode":            { "type": "string", "enum": ["LIEN","OBLIGATION"] },
+          "outstanding":     { "type": "string" }
+        }
+      },
+      "Pool": {
+        "type": "object",
+        "properties": {
+          "poolAddress":       { "type": "string" },
+          "agent":             { "type": "string" },
+          "jobId":             { "type": "string" },
+          "approvedAmount":    { "type": "string" },
+          "totalSpent":        { "type": "string" },
+          "remaining":         { "type": "string" },
+          "perTxLimit":        { "type": "string" },
+          "expiry":            { "type": "string" },
+          "expiryDate":        { "type": "string", "format": "date-time" },
+          "timeRemainingSeconds": { "type": "integer" },
+          "frozen":            { "type": "boolean" },
+          "allowedRecipients": { "type": "array", "items": { "type": "string" } },
+          "spentPct":          { "type": "number" }
+        }
+      },
+      "MCPRequest": {
+        "type": "object",
+        "required": ["method"],
+        "properties": {
+          "method": { "type": "string", "enum": ["tools/list","tools/call"] },
+          "params": {
+            "type": "object",
+            "properties": {
+              "name":      { "type": "string" },
+              "arguments": { "type": "object" }
+            }
+          }
+        }
+      },
+      "MCPResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "enum": ["text"] },
+                "text": { "type": "string" }
+              }
+            }
+          },
+          "isError": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "API and chain health",
+        "operationId": "getHealth",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status":          { "type": "string", "enum": ["ok","degraded"] },
+                    "version":         { "type": "string" },
+                    "contracts":       { "type": "object" },
+                    "contractsReady":  { "type": "boolean" },
+                    "chain":           { "type": "object" },
+                    "timestamp":       { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/discover": {
+      "get": {
+        "summary": "Agent discovery endpoint",
+        "description": "Machine-readable capability discovery. Returns protocol parameters, contract addresses, auth instructions, and the full agent journey. Start here.",
+        "operationId": "discover",
+        "tags": ["Discovery"],
+        "x-agent-facing": true,
+        "x-auth-required": false,
+        "responses": {
+          "200": {
+            "description": "Discovery document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "protocol":      { "type": "string" },
+                    "version":       { "type": "string" },
+                    "description":   { "type": "string" },
+                    "capabilities":  { "type": "array", "items": { "type": "string" } },
+                    "contracts":     { "type": "object" },
+                    "parameters":    { "type": "object" },
+                    "authentication":{ "type": "object" },
+                    "agent_journey": { "type": "array" },
+                    "mcp":           { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agent-card.json": {
+      "get": {
+        "summary": "Agent card — standardised capability manifest",
+        "operationId": "getAgentCard",
+        "tags": ["Discovery"],
+        "x-agent-facing": true,
+        "responses": {
+          "200": { "description": "Agent card JSON" }
+        }
+      }
+    },
+    "/v1/mcp": {
+      "post": {
+        "summary": "MCP tool dispatcher",
+        "description": "Model Context Protocol endpoint. Send tools/list to enumerate tools or tools/call to invoke one.",
+        "operationId": "mcp",
+        "tags": ["MCP"],
+        "x-agent-facing": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MCPRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MCPResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/agents/{address}": {
+      "get": {
+        "summary": "Agent credit profile and eligibility",
+        "description": "Returns an agent's credit limit, current exposure, available credit, active job count, and eligibility status. No authentication required.",
+        "operationId": "getAgentProfile",
+        "tags": ["Agents"],
+        "x-agent-facing": true,
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Agent wallet address (0x...)" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent":    { "type": "string" },
+                    "credit":   { "$ref": "#/components/schemas/AgentCredit" },
+                    "jobs":     { "type": "object" },
+                    "eligible": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/agents/verify": {
+      "post": {
+        "summary": "Verify agent and get full credit profile",
+        "operationId": "verifyAgent",
+        "tags": ["Agents"],
+        "x-agent-facing": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agentAddress"],
+                "properties": {
+                  "agentAddress": { "type": "string", "description": "Agent wallet address" },
+                  "jobId":        { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Credit profile" },
+          "400": { "description": "Missing agentAddress", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/v2/jobs/verify": {
+      "post": {
+        "summary": "Verify a job is eligible for financing",
+        "description": "Checks job existence, funded status, lien establishment, expiry, and adapter registration. Returns eligibility and maximum advance amount.",
+        "operationId": "verifyJob",
+        "tags": ["Jobs"],
+        "x-agent-facing": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["protocol","jobId"],
+                "properties": {
+                  "protocol":        { "type": "string", "description": "Job protocol contract address" },
+                  "jobId":           { "type": "string" },
+                  "agentAddress":    { "type": "string" },
+                  "requestedAmount": { "type": "string", "description": "USDC raw units (6 decimals)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "protocol":   { "type": "string" },
+                    "jobId":      { "type": "string" },
+                    "registered": { "type": "boolean" },
+                    "job":        { "$ref": "#/components/schemas/JobView" },
+                    "maxAdvance": { "type": "string" },
+                    "warnings":   { "type": "array", "items": { "type": "string" } },
+                    "eligible":   { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/credit/quote": {
+      "post": {
+        "summary": "Get a financing quote",
+        "description": "Computes the maximum advance, fee, and total repayment for a given job and requested amount. No authentication required. The agent then calls draw() on-chain.",
+        "operationId": "getCreditQuote",
+        "tags": ["Credit"],
+        "x-agent-facing": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agentAddress","protocol","jobId","requestedAmount"],
+                "properties": {
+                  "agentAddress":    { "type": "string" },
+                  "protocol":        { "type": "string" },
+                  "jobId":           { "type": "string" },
+                  "requestedAmount": { "type": "string", "description": "USDC raw units (6 decimals)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Financing quote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agentAddress":    { "type": "string" },
+                    "protocol":        { "type": "string" },
+                    "jobId":           { "type": "string" },
+                    "requestedAmount": { "type": "string" },
+                    "quote":           { "$ref": "#/components/schemas/Quote" },
+                    "calldata":        { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/positions/{jobId}": {
+      "get": {
+        "summary": "Get financing position for a job",
+        "operationId": "getPosition",
+        "tags": ["Positions"],
+        "x-agent-facing": true,
+        "parameters": [
+          { "name": "jobId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Position state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Position" } } }
+          }
+        }
+      }
+    },
+    "/v2/pools/{poolAddress}": {
+      "get": {
+        "summary": "Get spending pool state",
+        "operationId": "getPool",
+        "tags": ["Pools"],
+        "x-agent-facing": true,
+        "parameters": [
+          { "name": "poolAddress", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pool state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pool" } } }
+          }
+        }
+      }
+    },
+    "/v2/pools/{poolAddress}/spend": {
+      "post": {
+        "summary": "Validate a spend and get calldata",
+        "description": "Verifies the spend is within pool limits and returns spend() calldata for agent submission. Requires EIP-712 authentication.",
+        "operationId": "requestSpend",
+        "tags": ["Pools"],
+        "x-agent-facing": true,
+        "security": [{ "AgentEIP712": [] }],
+        "parameters": [
+          { "name": "poolAddress", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agentAddress","nonce","expiry","recipient","amount"],
+                "properties": {
+                  "agentAddress": { "type": "string" },
+                  "nonce":        { "type": "string" },
+                  "expiry":       { "type": "string" },
+                  "recipient":    { "type": "string" },
+                  "amount":       { "type": "string" },
+                  "purpose":      { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Validated spend calldata" },
+          "401": { "description": "Missing or invalid EIP-712 signature", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Pool does not belong to this agent" },
+          "400": { "description": "Pool frozen, expired, or limit exceeded" }
+        }
+      }
+    },
+    "/v2/protocol": {
+      "get": {
+        "summary": "Protocol-wide statistics",
+        "operationId": "getProtocol",
+        "tags": ["System"],
+        "responses": {
+          "200": { "description": "TVL, utilization, Hood status, financing parameters" }
+        }
+      }
+    },
+    "/v2/hood/status": {
+      "get": {
+        "summary": "Hood security status",
+        "operationId": "getHoodStatus",
+        "tags": ["System"],
+        "responses": {
+          "200": { "description": "Hood limits, exposure, pause status" }
+        }
+      }
+    },
+    "/v2/registry/{protocol}": {
+      "get": {
+        "summary": "Check adapter registration for an external protocol",
+        "operationId": "getRegistry",
+        "tags": ["System"],
+        "parameters": [
+          { "name": "protocol", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Adapter registration and tier" }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Discovery", "description": "Machine-readable capability discovery — start here" },
+    { "name": "Agents",    "description": "Agent identity and credit profile" },
+    { "name": "Jobs",      "description": "Job verification and eligibility" },
+    { "name": "Credit",    "description": "Financing quotes and terms" },
+    { "name": "Positions", "description": "Active and historical financing positions" },
+    { "name": "Pools",     "description": "Job-specific controlled spending pools" },
+    { "name": "MCP",       "description": "Model Context Protocol tool interface" },
+    { "name": "System",    "description": "Protocol health, stats, and security" }
+  ]
+}

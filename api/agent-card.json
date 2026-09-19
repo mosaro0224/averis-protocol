@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "name": "Averis Protocol",
+  "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs — an agent with an active, funded job can request a temporary controlled spending pool to bridge capital shortfalls and complete the job. Principal and fees are repaid automatically from the job receivable.",
+  "url": "https://averis.finance",
+  "api": {
+    "base_url": "/",
+    "version": "v2",
+    "openapi": "/openapi.json",
+    "discover": "/v1/discover",
+    "mcp": "/v1/mcp"
+  },
+  "capabilities": [
+    "agent_working_capital",
+    "agent_financing",
+    "agent_liquidity",
+    "ai_agent_funding",
+    "usdc_financing",
+    "erc8183_financing",
+    "agentic_finance",
+    "job_backed_credit",
+    "controlled_spending_pool",
+    "receivable_financing"
+  ],
+  "keywords": [
+    "agent working capital",
+    "agent financing",
+    "agent liquidity",
+    "AI agent funding",
+    "USDC financing",
+    "ERC-8183 financing",
+    "agentic finance",
+    "job-backed credit",
+    "autonomous agent lending",
+    "working capital protocol",
+    "agent credit facility",
+    "spending pool",
+    "receivable financing",
+    "on-chain working capital",
+    "agent liquidity provider"
+  ],
+  "authentication": {
+    "type": "eip712",
+    "description": "Mutating requests require an EIP-712 signature over {agentAddress, nonce, expiry, chainId} in the X-Agent-Signature header. Discovery, eligibility, and quote endpoints are unauthenticated.",
+    "header": "X-Agent-Signature",
+    "domain": { "name": "AverisProtocol", "version": "2" },
+    "primaryType": "AgentRequest",
+    "types": {
+      "AgentRequest": [
+        { "name": "agentAddress", "type": "address" },
+        { "name": "nonce",        "type": "uint256" },
+        { "name": "expiry",       "type": "uint256" },
+        { "name": "chainId",      "type": "uint256" }
+      ]
+    }
+  },
+  "chain": {
+    "id": 1227,
+    "name": "Arc Testnet",
+    "rpc": "https://rpc.testnet.arc.io",
+    "token": "USDC",
+    "usdc_decimals": 6,
+    "explorer": "https://explorer.testnet.arc.io"
+  },
+  "agent_journey": [
+    { "step": 1, "action": "discover",    "endpoint": "GET /v1/discover",                "auth": false, "description": "Get capabilities, contracts, parameters, and auth instructions" },
+    { "step": 2, "action": "eligibility", "endpoint": "GET /v2/agents/:address",         "auth": false, "description": "Check credit profile, available credit, and job slots" },
+    { "step": 3, "action": "verify_job",  "endpoint": "POST /v2/jobs/verify",            "auth": false, "description": "Confirm job is funded, active, and lien is established" },
+    { "step": 4, "action": "quote",       "endpoint": "POST /v2/credit/quote",           "auth": false, "description": "Get financing terms: approved amount, fee, total repayment" },
+    { "step": 5, "action": "fund",        "endpoint": "on-chain AverisFinancingV2.draw()", "auth": true, "description": "Call draw() with quote parameters — creates controlled spending pool" },
+    { "step": 6, "action": "pool_status", "endpoint": "GET /v2/pools/:poolAddress",      "auth": false, "description": "Monitor spending pool balance, limits, and expiry" },
+    { "step": 7, "action": "spend",       "endpoint": "POST /v2/pools/:poolAddress/spend", "auth": true, "description": "Get validated spend() calldata — submit from agent wallet" },
+    { "step": 8, "action": "position",    "endpoint": "GET /v2/positions/:jobId",        "auth": false, "description": "Track financing position and automatic repayment status" }
+  ],
+  "mcp": {
+    "endpoint": "/v1/mcp",
+    "protocol": "MCP/1.0",
+    "description": "Model Context Protocol endpoint — exposes all agent capabilities as structured tools for MCP-compatible AI frameworks",
+    "tools": [
+      "averis_discover",
+      "averis_protocol_status",
+      "averis_check_eligibility",
+      "averis_verify_job",
+      "averis_get_quote",
+      "averis_request_funding",
+      "averis_pool_status",
+      "averis_position_status"
+    ]
+  },
+  "contact": { "x": "https://x.com/averis_protocol" }
+}

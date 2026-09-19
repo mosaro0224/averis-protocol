@@ -5,6 +5,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node api/server.mjs",
-    "test:api": "node --test api/**/*.test.mjs"
+    "wire": "node scripts/wire.mjs",
+    "test:api": "node --test api/**/*.test.mjs",
+    "test:discovery": "node --test api/discovery.test.mjs api/mcp.test.mjs"
   }
 }
