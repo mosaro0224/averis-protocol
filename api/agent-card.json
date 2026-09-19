@@ -1,8 +1,11 @@
 {
   "schema_version": "1.0",
   "name": "Averis Protocol",
-  "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs — an agent with an active, funded job can request a temporary controlled spending pool to bridge capital shortfalls and complete the job. Principal and fees are repaid automatically from the job receivable.",
+  "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs — an agent with an active, funded job can request a temporary controlled spending pool to bridge a capital shortfall and complete the job. Principal and fees are repaid automatically from the job receivable.",
   "url": "https://averisprotocol.netlify.app",
+  "status": "testnet",
+  "network_note": "Currently live on Arc Testnet (chain 1227). Mainnet deployment is on the roadmap. USDC on this network has no real-world value.",
+
   "api": {
     "base_url": "https://averis-protocol-production.up.railway.app",
     "version": "v2",
@@ -11,6 +14,7 @@
     "mcp": "https://averis-protocol-production.up.railway.app/v1/mcp",
     "health": "https://averis-protocol-production.up.railway.app/health"
   },
+
   "capabilities": [
     "agent_working_capital",
     "agent_financing",
@@ -23,6 +27,7 @@
     "controlled_spending_pool",
     "receivable_financing"
   ],
+
   "keywords": [
     "agent working capital",
     "agent financing",
@@ -40,6 +45,59 @@
     "on-chain working capital",
     "agent liquidity provider"
   ],
+
+  "protocol_terms": {
+    "note": "Live values read from AverisFinancingV2 on Arc Testnet. These are the actual on-chain parameters.",
+    "advance_rate_pct": 20,
+    "advance_rate_bps": 2000,
+    "financing_fee_pct": 2,
+    "financing_fee_bps": 200,
+    "max_per_agent_usdc": 10000,
+    "max_per_agent_raw": "10000000000",
+    "protocol_maximum_usdc": 50000,
+    "protocol_maximum_raw": "50000000000",
+    "usdc_decimals": 6,
+    "fee_split": {
+      "lp_pct": 70,
+      "treasury_pct": 20,
+      "reserve_pct": 10
+    },
+    "example": {
+      "job_budget_usdc": 1000,
+      "max_advance_usdc": 200,
+      "financing_fee_usdc": 4,
+      "total_repayment_usdc": 204,
+      "agent_receives_usdc": 796
+    }
+  },
+
+  "protocol_status": {
+    "note": "Live values read from chain at last agent-card update.",
+    "hood_paused": false,
+    "vault_tvl_usdc": 0,
+    "vault_tvl_note": "Testnet — no LP deposits yet. Deposit USDC to the vault to provide liquidity.",
+    "contracts_deployed": true,
+    "contracts_wired": true,
+    "adapter_registered": true
+  },
+
+  "eligibility_requirements": [
+    "Job must exist in a registered adapter protocol (AverisACP or ERC-8183 compatible)",
+    "Job must be funded and active (status: FUNDED)",
+    "Caller must be the job provider/agent address",
+    "Job payout receiver must be set to AverisReceivableRouter before funding",
+    "Job must not have expired",
+    "Job must not already have an active financing position",
+    "Agent exposure must not exceed per-agent cap (10,000 USDC)",
+    "Requested amount must not exceed 20% of job budget"
+  ],
+
+  "repayment": {
+    "mode_lien": "Automatic — job settlement routed through ReceivableRouter → AverisFinancingV2 → vault. No agent action required.",
+    "mode_obligation": "EIP-712 signed repayment obligation. Agent must call repayObligation() after settlement.",
+    "default_handling": "If job expires or is rejected, unused pool capital is returned to vault. Net loss is written off against vault NAV."
+  },
+
   "authentication": {
     "type": "eip712",
     "description": "Mutating requests require an EIP-712 signature over {agentAddress, nonce, expiry, chainId} in the X-Agent-Signature header. Discovery, eligibility, and quote endpoints are unauthenticated.",
@@ -53,40 +111,91 @@
         { "name": "expiry",       "type": "uint256" },
         { "name": "chainId",      "type": "uint256" }
       ]
-    }
+    },
+    "unauthenticated_endpoints": [
+      "GET /v1/discover",
+      "GET /.well-known/agent-card.json",
+      "GET /openapi.json",
+      "GET /health",
+      "GET /v2/agents/:address",
+      "POST /v2/jobs/verify",
+      "POST /v2/credit/quote",
+      "GET /v2/positions/:jobId",
+      "GET /v2/pools/:poolAddress",
+      "POST /v1/mcp (tools/list, averis_discover, averis_protocol_status, averis_check_eligibility, averis_get_quote, averis_pool_status, averis_position_status)"
+    ],
+    "authenticated_endpoints": [
+      "POST /v2/pools/:poolAddress/spend",
+      "POST /v1/mcp (averis_request_funding, averis_repay)"
+    ]
   },
+
   "chain": {
     "id": 1227,
     "name": "Arc Testnet",
     "rpc": "https://rpc.testnet.arc.io",
     "token": "USDC",
+    "usdc_address": "0x3600000000000000000000000000000000000000",
     "usdc_decimals": 6,
-    "explorer": "https://explorer.testnet.arc.io"
+    "explorer": "https://explorer.testnet.arc.io",
+    "block_time_ms": 500
   },
+
+  "contracts": {
+    "AverisVault":           "0x0c60e6b789286d8d3815ca4760839b3dc50a2967",
+    "AverisFinancingV2":     "0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f",
+    "AverisACP":             "0x230fb4771e32c5f6f2d157131f7976915fc65248",
+    "ReceivableRouter":      "0x89ff42862307145b92f5c6bf72772140e4bab57a",
+    "AverisHood":            "0xa37135beeb44a9b0a9c59e552d60935f9babcea0",
+    "AverisPoolFactory":     "0xff52e6bc002f3facff0317918bfd7e93525fe7ed",
+    "AverisAdapterRegistry": "0x5bdaa397a2d24de1e9e6c25f57c475e4c35c2f8b",
+    "AverisCredit":          "0x0db85a8d55fa1bbb06f34219f72c65f17dbe10d8",
+    "AverisReserve":         "0x9a025a6b3c31093fe16d60d7b48e527afb24b357",
+    "AverisACPAdapter":      "0x2ad747c735cec953e3277e7b203b2c5b478da5f1"
+  },
+
   "agent_journey": [
-    { "step": 1, "action": "discover",    "endpoint": "GET /v1/discover",                "auth": false, "description": "Get capabilities, contracts, parameters, and auth instructions" },
-    { "step": 2, "action": "eligibility", "endpoint": "GET /v2/agents/:address",         "auth": false, "description": "Check credit profile, available credit, and job slots" },
-    { "step": 3, "action": "verify_job",  "endpoint": "POST /v2/jobs/verify",            "auth": false, "description": "Confirm job is funded, active, and lien is established" },
-    { "step": 4, "action": "quote",       "endpoint": "POST /v2/credit/quote",           "auth": false, "description": "Get financing terms: approved amount, fee, total repayment" },
-    { "step": 5, "action": "fund",        "endpoint": "on-chain AverisFinancingV2.draw()", "auth": true, "description": "Call draw() with quote parameters — creates controlled spending pool" },
-    { "step": 6, "action": "pool_status", "endpoint": "GET /v2/pools/:poolAddress",      "auth": false, "description": "Monitor spending pool balance, limits, and expiry" },
-    { "step": 7, "action": "spend",       "endpoint": "POST /v2/pools/:poolAddress/spend", "auth": true, "description": "Get validated spend() calldata — submit from agent wallet" },
-    { "step": 8, "action": "position",    "endpoint": "GET /v2/positions/:jobId",        "auth": false, "description": "Track financing position and automatic repayment status" }
+    { "step": 1, "action": "discover",    "endpoint": "GET /v1/discover",                  "auth": false, "description": "Get capabilities, contracts, live parameters, and auth instructions" },
+    { "step": 2, "action": "eligibility", "endpoint": "GET /v2/agents/:address",           "auth": false, "description": "Check credit profile, available credit, and active exposure" },
+    { "step": 3, "action": "verify_job",  "endpoint": "POST /v2/jobs/verify",              "auth": false, "description": "Confirm job is funded, active, and lien is correctly established" },
+    { "step": 4, "action": "quote",       "endpoint": "POST /v2/credit/quote",             "auth": false, "description": "Get financing terms: approved amount, fee, total repayment, expiry" },
+    { "step": 5, "action": "fund",        "endpoint": "on-chain AverisFinancingV2.draw()", "auth": true,  "description": "Submit draw() transaction — creates job-specific controlled spending pool" },
+    { "step": 6, "action": "pool_status", "endpoint": "GET /v2/pools/:poolAddress",        "auth": false, "description": "Monitor pool balance, spending limits, allowed recipients, and expiry" },
+    { "step": 7, "action": "spend",       "endpoint": "POST /v2/pools/:poolAddress/spend", "auth": true,  "description": "Get validated spend() calldata — agent submits from its own wallet" },
+    { "step": 8, "action": "position",    "endpoint": "GET /v2/positions/:jobId",          "auth": false, "description": "Track financing position lifecycle and automatic repayment status" },
+    { "step": 9, "action": "settlement",  "endpoint": "automatic on-chain",                "auth": false, "description": "Job settlement triggers ReceivableRouter — principal + fee repaid, remainder to agent" }
   ],
+
   "mcp": {
-    "endpoint": "/v1/mcp",
+    "endpoint": "https://averis-protocol-production.up.railway.app/v1/mcp",
     "protocol": "MCP/1.0",
-    "description": "Model Context Protocol endpoint — exposes all agent capabilities as structured tools for MCP-compatible AI frameworks",
+    "description": "Model Context Protocol endpoint. Exposes all agent capabilities as structured tools for MCP-compatible AI frameworks. Send {method: 'tools/list'} to enumerate all tools.",
     "tools": [
-      "averis_discover",
-      "averis_protocol_status",
-      "averis_check_eligibility",
-      "averis_verify_job",
-      "averis_get_quote",
-      "averis_request_funding",
-      "averis_pool_status",
-      "averis_position_status"
+      { "name": "averis_discover",         "auth": false, "description": "Full protocol overview, parameters, contracts, and agent journey" },
+      { "name": "averis_protocol_status",  "auth": false, "description": "Live TVL, liquidity, utilization, and Hood circuit-breaker status" },
+      { "name": "averis_check_eligibility","auth": false, "description": "Agent credit profile: limit, exposure, available credit, active jobs" },
+      { "name": "averis_verify_job",       "auth": false, "description": "Verify job eligibility for financing" },
+      { "name": "averis_get_quote",        "auth": false, "description": "Financing quote: approved amount, fee, repayment, expiry" },
+      { "name": "averis_request_funding",  "auth": true,  "description": "Returns draw() calldata for agent to submit on-chain (EIP-712 required)" },
+      { "name": "averis_pool_status",      "auth": false, "description": "Pool balance, spent, recipients, expiry, freeze status" },
+      { "name": "averis_position_status",  "auth": false, "description": "Full financing position state and repayment tracking" }
     ]
   },
-  "contact": { "x": "https://x.com/averis_protocol" }
+
+  "operator": {
+    "name": "Averis Protocol",
+    "x": "https://x.com/averis_protocol",
+    "github": "https://github.com/mosaro0224/averis-protocol",
+    "website": "https://averisprotocol.netlify.app",
+    "audit_status": "unaudited — testnet only. Do not use with real funds until a third-party audit is completed.",
+    "security_contact": "https://x.com/averis_protocol"
+  },
+
+  "mainnet_roadmap": [
+    "Third-party security audit of AverisFinancingV2, AverisJobPool, AverisHood, AverisReserve",
+    "LP deposits to seed vault liquidity",
+    "Gnosis Safe multisig treasury",
+    "Arc Mainnet deployment",
+    "Additional ERC-8183 adapter registrations for external job protocols"
+  ]
 }

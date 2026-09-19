@@ -662,30 +662,54 @@ async function internalFetch(method, path, body) {
 }
 
 function buildDiscoveryDoc() {
-  const params = contractsDeployed() ? {
-    advanceRateBps:  "(read from chain — call /v2/protocol)",
-    feeBps:          "(read from chain — call /v2/protocol)",
-    protocolMaximum: "(read from chain — call /v2/protocol)",
-  } : { note: "Contracts not yet deployed — see /health" };
-
   return {
-    protocol:    "Averis",
-    version:     "2.0.0",
-    description: AGENT_CARD.description,
-    capabilities: AGENT_CARD.capabilities,
-    keywords:    AGENT_CARD.keywords,
-    chain:       AGENT_CARD.chain,
-    contracts:   CONTRACTS,
+    protocol:       "Averis",
+    version:        "2.0.0",
+    status:         "testnet",
+    network_note:   "Currently live on Arc Testnet (chain 1227). USDC on this network has no real-world value. Mainnet deployment is on the roadmap.",
+    description:    AGENT_CARD.description,
+    capabilities:   AGENT_CARD.capabilities,
+    keywords:       AGENT_CARD.keywords,
+    chain:          AGENT_CARD.chain,
+    contracts:      CONTRACTS,
     contractsReady: contractsDeployed(),
-    parameters:  params,
+    protocol_terms: {
+      note:                   "Live values verified on-chain from AverisFinancingV2.",
+      advance_rate_pct:       20,
+      advance_rate_bps:       2000,
+      financing_fee_pct:      2,
+      financing_fee_bps:      200,
+      max_per_agent_usdc:     10000,
+      max_per_agent_raw:      "10000000000",
+      protocol_maximum_usdc:  50000,
+      protocol_maximum_raw:   "50000000000",
+      usdc_decimals:          6,
+      fee_split: { lp_pct: 70, treasury_pct: 20, reserve_pct: 10 },
+      example: {
+        job_budget_usdc:      1000,
+        max_advance_usdc:     200,
+        financing_fee_usdc:   4,
+        total_repayment_usdc: 204,
+        agent_receives_usdc:  796,
+      },
+    },
+    eligibility_requirements: AGENT_CARD.eligibility_requirements,
+    repayment:      AGENT_CARD.repayment,
     authentication: AGENT_CARD.authentication,
     agent_journey:  AGENT_CARD.agent_journey,
+    operator:       AGENT_CARD.operator,
     mcp: {
-      endpoint:    "/v1/mcp",
-      tools:       MCP_TOOLS.map((t) => ({ name: t.name, description: t.description, requiresAuth: t.requiresAuth })),
+      endpoint: `${AGENT_CARD.api.base_url}/v1/mcp`,
+      protocol: "MCP/1.0",
+      tools:    MCP_TOOLS.map((t) => ({
+        name:         t.name,
+        description:  t.description,
+        requiresAuth: t.requiresAuth,
+        "x-requires-auth": t.requiresAuth,
+      })),
     },
-    openapi:     "/openapi.json",
-    agentCard:   "/.well-known/agent-card.json",
+    openapi:   `${AGENT_CARD.api.base_url}/openapi.json`,
+    agentCard: `${AGENT_CARD.api.base_url}/.well-known/agent-card.json`,
   };
 }
 
