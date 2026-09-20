@@ -831,8 +831,8 @@ AVERIS PROTOCOL — Working Capital for Autonomous AI Agents
 ==========================================================
 Status:   TESTNET (Arc Testnet, chain 1227)
 Version:  2.0.0
-Website:  https://averisprotocol.netlify.app
-API:      https://averis-protocol-production.up.railway.app
+Website:  https://averisprotocol.xyz
+API:      https://api.averisprotocol.xyz
 GitHub:   https://github.com/mosaro0224/averis-protocol
 
 WHAT AVERIS DOES

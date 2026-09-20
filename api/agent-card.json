@@ -2,17 +2,17 @@
   "schema_version": "1.0",
   "name": "Averis Protocol",
   "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs — an agent with an active, funded job can request a temporary controlled spending pool to bridge a capital shortfall and complete the job. Principal and fees are repaid automatically from the job receivable.",
-  "url": "https://averisprotocol.netlify.app",
+  "url": "https://averisprotocol.xyz",
   "status": "testnet",
   "network_note": "Currently live on Arc Testnet (chain 1227). Mainnet deployment is on the roadmap. USDC on this network has no real-world value.",
 
   "api": {
-    "base_url": "https://averis-protocol-production.up.railway.app",
+    "base_url": "https://api.averisprotocol.xyz",
     "version": "v2",
-    "openapi": "https://averis-protocol-production.up.railway.app/openapi.json",
-    "discover": "https://averis-protocol-production.up.railway.app/v1/discover",
-    "mcp": "https://averis-protocol-production.up.railway.app/v1/mcp",
-    "health": "https://averis-protocol-production.up.railway.app/health"
+    "openapi": "https://api.averisprotocol.xyz/openapi.json",
+    "discover": "https://api.averisprotocol.xyz/v1/discover",
+    "mcp": "https://api.averisprotocol.xyz/v1/mcp",
+    "health": "https://api.averisprotocol.xyz/health"
   },
 
   "capabilities": [
@@ -169,7 +169,7 @@
   ],
 
   "mcp": {
-    "endpoint": "https://averis-protocol-production.up.railway.app/v1/mcp",
+    "endpoint": "https://api.averisprotocol.xyz/v1/mcp",
     "protocol": "MCP/1.0",
     "description": "Model Context Protocol endpoint. Exposes all agent capabilities as structured tools for MCP-compatible AI frameworks. Send {method: 'tools/list'} to enumerate all tools.",
     "tools": [
@@ -189,7 +189,7 @@
     "name": "Averis Protocol",
     "x": "https://x.com/averis_protocol",
     "github": "https://github.com/mosaro0224/averis-protocol",
-    "website": "https://averisprotocol.netlify.app",
+    "website": "https://averisprotocol.xyz",
     "audit_status": "unaudited — testnet only. Do not use with real funds until a third-party audit is completed.",
     "security_contact": "https://x.com/averis_protocol"
   },
