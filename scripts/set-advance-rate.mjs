@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Averis Protocol — Set Advance Rate
- * Calls AverisFinancingV2.setAdvanceRateBps(newRate) from the owner wallet.
+ * Calls AverisFinancingV2.setParameters(ar, f, m, perTx) keeping existing
+ * fee/max/perTx values and only changing the advance rate.
  * Usage: node scripts/set-advance-rate.mjs [bps]
  * Example: node scripts/set-advance-rate.mjs 4000   ← sets to 40%
  */
@@ -14,7 +15,6 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Load .env manually
 try {
   const env = readFileSync(resolve(__dirname, '../.env'), 'utf8')
   for (const line of env.split('\n')) {
@@ -23,19 +23,16 @@ try {
   }
 } catch {}
 
-const PRIVATE_KEY        = process.env.PRIVATE_KEY
-const RPC_URL            = process.env.ARC_RPC_URL   || 'https://rpc.testnet.arc.io'
-const CHAIN_ID           = Number(process.env.ARC_CHAIN_ID || 1227)
-const FINANCING_ADDRESS  = process.env.AVERIS_FINANCING || '0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f'
+const PRIVATE_KEY       = process.env.PRIVATE_KEY
+const RPC_URL           = process.env.ARC_RPC_URL    || 'https://rpc.testnet.arc.io'
+const CHAIN_ID          = Number(process.env.ARC_CHAIN_ID || 1227)
+const FINANCING_ADDRESS = (process.env.AVERIS_FINANCING || '0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f')
 
-if (!PRIVATE_KEY) {
-  console.error('\nMissing PRIVATE_KEY in .env\n')
-  process.exit(1)
-}
+if (!PRIVATE_KEY) { console.error('\nMissing PRIVATE_KEY in .env\n'); process.exit(1) }
 
 const newRateBps = Number(process.argv[2] ?? 4000)
-if (isNaN(newRateBps) || newRateBps < 0 || newRateBps > 10000) {
-  console.error('\nInvalid rate. Must be 0–10000 bps (e.g. 4000 = 40%).\n')
+if (isNaN(newRateBps) || newRateBps < 100 || newRateBps > 9000) {
+  console.error('\nInvalid rate. Must be 100–9000 bps (e.g. 4000 = 40%).\n')
   process.exit(1)
 }
 
@@ -47,9 +44,21 @@ const arcTestnet = defineChain({
 })
 
 const ABI = [
-  { name: 'advanceRateBps',    type: 'function', stateMutability: 'view',       inputs: [],                                       outputs: [{ type: 'uint16' }] },
-  { name: 'setAdvanceRateBps', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'bps', type: 'uint16' }],         outputs: [] },
-  { name: 'owner',             type: 'function', stateMutability: 'view',       inputs: [],                                       outputs: [{ type: 'address' }] },
+  { name: 'owner',            type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+  { name: 'advanceRateBps',   type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16'  }] },
+  { name: 'feeBps',           type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16'  }] },
+  { name: 'protocolMaximum',  type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint128' }] },
+  { name: 'defaultPerTxLimit',type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint128' }] },
+  {
+    name: 'setParameters', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'ar',    type: 'uint16'  },
+      { name: 'f',     type: 'uint16'  },
+      { name: 'm',     type: 'uint128' },
+      { name: 'perTx', type: 'uint128' },
+    ],
+    outputs: [],
+  },
 ]
 
 const account      = privateKeyToAccount(PRIVATE_KEY)
@@ -63,28 +72,39 @@ console.log(`Signer:      ${account.address}`)
 console.log(`Contract:    ${FINANCING_ADDRESS}`)
 console.log(`New rate:    ${newRateBps} bps (${newRateBps / 100}%)`)
 
-// Pre-flight
+// Pre-flight: confirm owner
 const owner = await publicClient.readContract({ address: FINANCING_ADDRESS, abi: ABI, functionName: 'owner' })
 if (owner.toLowerCase() !== account.address.toLowerCase()) {
   console.error(`\n  ✗ Signer is NOT the contract owner (owner is ${owner})\n`)
   process.exit(1)
 }
 
-const currentRate = await publicClient.readContract({ address: FINANCING_ADDRESS, abi: ABI, functionName: 'advanceRateBps' })
-console.log(`\nCurrent rate: ${currentRate} bps (${Number(currentRate) / 100}%)`)
+// Read current values — keep fee/max/perTx unchanged
+const [currentRate, feeBps, protocolMax, perTxLimit] = await Promise.all([
+  publicClient.readContract({ address: FINANCING_ADDRESS, abi: ABI, functionName: 'advanceRateBps' }),
+  publicClient.readContract({ address: FINANCING_ADDRESS, abi: ABI, functionName: 'feeBps' }),
+  publicClient.readContract({ address: FINANCING_ADDRESS, abi: ABI, functionName: 'protocolMaximum' }),
+  publicClient.readContract({ address: FINANCING_ADDRESS, abi: ABI, functionName: 'defaultPerTxLimit' }),
+])
+
+console.log(`\nCurrent parameters:`)
+console.log(`  advanceRateBps:  ${Number(currentRate)} (${Number(currentRate)/100}%)`)
+console.log(`  feeBps:          ${Number(feeBps)} (${Number(feeBps)/100}%)`)
+console.log(`  protocolMaximum: ${protocolMax}`)
+console.log(`  defaultPerTxLimit: ${perTxLimit}`)
 
 if (Number(currentRate) === newRateBps) {
   console.log(`\n  ✓ Already set to ${newRateBps} bps. Nothing to do.\n`)
   process.exit(0)
 }
 
-console.log(`\nSending setAdvanceRateBps(${newRateBps})...`)
+console.log(`\nCalling setParameters(${newRateBps}, ${feeBps}, ${protocolMax}, ${perTxLimit})...`)
 
 const hash = await walletClient.writeContract({
   address:      FINANCING_ADDRESS,
   abi:          ABI,
-  functionName: 'setAdvanceRateBps',
-  args:         [newRateBps],
+  functionName: 'setParameters',
+  args:         [newRateBps, Number(feeBps), BigInt(protocolMax), BigInt(perTxLimit)],
 })
 
 console.log(`  tx: ${hash}`)
@@ -95,6 +115,7 @@ const receipt = await publicClient.waitForTransactionReceipt({ hash })
 if (receipt.status === 'success') {
   const updated = await publicClient.readContract({ address: FINANCING_ADDRESS, abi: ABI, functionName: 'advanceRateBps' })
   console.log(`\n  ✓ Advance rate updated: ${Number(updated) / 100}%`)
+  console.log(`  Fee and limits unchanged.`)
   console.log(`  Explorer: https://explorer.testnet.arc.io/tx/${hash}\n`)
 } else {
   console.error(`\n  ✗ Transaction reverted: ${hash}\n`)
