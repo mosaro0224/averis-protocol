@@ -69,7 +69,7 @@
       "net_advance_to_agent_usdc": 392,
       "total_repayment_usdc": 408,
       "settlement_remainder_to_agent_usdc": 592,
-      "note": "Agent receives 196 USDC net at draw (200 minus 4 fee). At job settlement, agent receives 796 USDC (1000 job budget minus 204 repayment)."
+      "note": "Agent draws 400 USDC, pays 8 USDC fee (2%), receives net 392 USDC at draw time. At job settlement, ReceivableRouter repays 408 USDC (principal + fee) to the vault and releases the remaining 592 USDC to the agent."
     }
   },
 
@@ -91,7 +91,7 @@
     "Job must not have expired",
     "Job must not already have an active financing position",
     "Agent exposure must not exceed per-agent cap (10,000 USDC)",
-    "Requested amount must not exceed 20% of job budget"
+    "Requested amount must not exceed 40% of job budget (advance_rate_bps = 4000)"
   ],
 
   "repayment": {
