@@ -1,40 +1,87 @@
-# Averis V1 architecture
+# Averis V2 Architecture
 
-## What is enforceable
+## Overview
 
-`AverisACP` is an Averis-owned ERC-8183-compatible job escrow. Before funding, only the provider can set the provider-side payout receiver. That value is immutable after funding. A financed job must name `ReceivableRouter`; the router accepts settlement only from `AverisACP` and forwards it, in the same settlement transaction, to `AverisFinancing`. Financing sends principal plus the pre-agreed fee to `AverisVault`, then sends any remainder to the provider.
+Averis is working-capital infrastructure for autonomous AI agents. It finances verified job receivables: an agent with a funded escrow job can draw a temporary controlled spending pool, and principal plus fee are repaid automatically when the job settles.
 
-This is a receivable lien, not authority over an agent wallet. The agent receives draw funds directly and grants no unlimited ERC-20 allowance to Averis.
-
-```text
-LP -> AverisVault -> AverisFinancing -> provider
-job escrow -> ReceivableRouter -> Financing -> vault + provider remainder
+```
+LP → AverisVault → AverisFinancingV2 → AverisJobPool → agent spends
+job escrow → ReceivableRouter → AverisFinancingV2 → vault repaid + agent remainder
 ```
 
 ## Contracts
 
 | Contract | Responsibility |
 | --- | --- |
-| `AverisVault` | USDC deposits, shares, deployed-principal accounting, liquidity-limited withdrawals. |
-| `AverisFinancing` | one job-bound position, deterministic cap, draw, repayment/default accounting. |
-| `ReceivableRouter` | immutable payout receiver; accepts settlement only from the configured escrow. |
-| `AverisACP` | authoritative ERC-8183-compatible job state, USDC escrow, immutable-at-funding payout receiver, settlement and refund paths. |
+| `AverisVault` | ERC-4626 USDC vault. LP deposits, shares, deployed-principal accounting, liquidity-limited withdrawals. |
+| `AverisFinancingV2` | Core financing engine. Position lifecycle (NONE→ACTIVE→REPAID/DEFAULTED/EXPIRED). draw(), repayment, fee split. |
+| `AverisJobPool` | Per-position controlled spending pool. Allowlisted recipients, per-tx cap, expiry, freeze. |
+| `AverisPoolFactory` | CREATE2 factory for deterministic pool addresses. |
+| `AverisHood` | Exposure controller and circuit breaker. Per-agent cap, total cap, concentration limit, pause. |
+| `AverisCredit` | Modular credit engine. Per-agent credit limits, custom overrides. |
+| `AverisReserve` | On-chain fee accumulator for the reserve slice (10% of fees). |
+| `AverisAdapterRegistry` | Owner-managed registry of external job protocol adapters (NATIVE / VERIFIED / ATTESTED tiers). |
+| `ReceivableRouter` | Immutable payout receiver. Accepts settlement only from registered protocols, routes repayment. |
+| `AverisACP` | Native ERC-8183-compatible job escrow. Immutable-at-funding payout receiver, settlement and refund paths. |
 
-`maxAdvance = min(receivable × advance rate, agent cap, protocol cap, vault liquid USDC)`. Parameters are owner-controlled V1 configuration and should be owned by a timelocked multisig in production. No backend address is authorized to lend, withdraw, settle, or redirect funds.
+## Adapter tiers
 
-## State and failures
+| Tier | Description |
+| --- | --- |
+| NATIVE | AverisACP — full on-chain lien, automatic repayment via ReceivableRouter |
+| VERIFIED | ERC-8183 / generic escrow with verifiable payout receiver |
+| ATTESTED | No escrow — EIP-712 repayment obligation, manual repayObligation() call required |
 
-`NONE -> ACTIVE -> REPAID | PARTIALLY_RECOVERED | DEFAULTED | EXPIRED`. Partial settlement repays what exists, with principal before fees. Rejected/cancelled/expired jobs are marked permissionlessly after the adapter reports terminal state. The remaining unpaid principal stays as a vault loss; it is not hidden.
+## Advance calculation
 
-## ERC-8183 and ERC-8004
+```
+maxAdvance = min(
+  jobBudget × advanceRateBps / 10000,   // 40% of budget
+  agentCreditLimit,                      // per-agent cap (default 10,000 USDC)
+  protocolMaximum,                       // 50,000 USDC
+  vaultAvailableLiquidity
+)
+```
 
-Arc's deployed ERC-8183 contract does not expose a provider payout receiver in its documented deployed interface, so it cannot enforce this lien. Averis therefore deploys `AverisACP` rather than pretending an after-hook can collect a job receivable. `complete` and `settleClaim` transfer to the immutable receiver and call it in the same transaction; a failing callback reverts settlement. `reject` and `claimRefund` refund the client and leave financing as a transparent default/write-off.
+## Fee split
 
-ERC-8004 was not present. V1 uses the provider address as agent identity; ERC-8004 can later enrich display/reputation only, never override on-chain limits.
+- 70% → LP vault (increases share value)
+- 20% → treasury
+- 10% → AverisReserve accumulator
 
-## Explicit limitations
+## Position lifecycle
 
-- This is testnet-oriented code, not audited production software.
-- Defaults are accounted for but V1 has no collateral or collection beyond the routed receivable.
-- Owner can tune caps/rates and per-agent limits; use a multisig + timelock before public deployment.
-- The included mock escrow is solely for tests, never deployment.
+```
+NONE → ACTIVE → REPAID
+               → DEFAULTED
+               → EXPIRED
+               → PARTIALLY_RECOVERED
+```
+
+- **ACTIVE:** pool created, agent spending
+- **REPAID:** full principal + fee returned to vault
+- **DEFAULTED:** job rejected or expired, loss written off against vault NAV
+- **PARTIALLY_RECOVERED:** partial settlement, remainder written off
+- **EXPIRED:** position expired before settlement
+
+## Security model
+
+- No backend address is authorized to lend, withdraw, settle, or redirect funds
+- All limits enforced on-chain by AverisHood
+- Spending pools are agent-controlled but recipient-allowlisted
+- Owner controls: advance rate, fee, caps, pause (use multisig + timelock in production)
+- Agent is NOT personally liable on default — financing is non-recourse, secured only by the job receivable
+
+## Chain
+
+- Network: Arc Testnet (chain ID 1227)
+- RPC: `https://rpc.testnet.arc.io`
+- Explorer: `https://explorer.testnet.arc.io`
+- USDC: `0x3600000000000000000000000000000000000000` (native gas token = USDC on Arc)
+
+## Limitations (testnet)
+
+- Unaudited. Not production software.
+- No timelock on owner functions — add before public mainnet launch.
+- No on-chain reputation or blacklist in V2 — owner may set per-agent credit limit to zero manually.
+- No event indexer — position history requires a subgraph or log scanner.

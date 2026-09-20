@@ -4,36 +4,82 @@
 
 | Setting | Value |
 | --- | --- |
-| Chain ID | `5042002` |
-| RPC | `https://rpc.testnet.arc.network` |
-| Explorer | `https://testnet.arcscan.app` |
+| Chain ID | `1227` |
+| RPC | `https://rpc.testnet.arc.io` |
+| Explorer | `https://explorer.testnet.arc.io` |
 | USDC ERC-20 | `0x3600000000000000000000000000000000000000` |
 
-Arc uses USDC for gas. Its native balance uses 18 decimals while the ERC-20 interface uses 6; protocol amounts use the ERC-20 interface only.
+Arc uses USDC for gas. Its native balance uses 18 decimals while the ERC-20 interface uses 6. Protocol amounts always use the ERC-20 interface (6 decimals).
 
-## Deploy contracts
+## Deployed contracts (Arc Testnet)
 
-1. Install Foundry and fund the deployer with test USDC from Circle’s faucet.
-2. Run `forge test -vvv`; all tests must pass. Averis deploys its own `AverisACP` escrow; do not deploy `MockReceivableEscrow`.
-3. Set `ARC_RPC_URL`, `ARC_USDC`, `PROTOCOL_MAX_USDC`, and `PRIVATE_KEY` in your shell (never commit the key).
-5. Run:
+| Contract | Address |
+| --- | --- |
+| AverisVault | `0x0c60e6b789286d8d3815ca4760839b3dc50a2967` |
+| AverisFinancingV2 | `0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f` |
+| AverisACP | `0x230fb4771e32c5f6f2d157131f7976915fc65248` |
+| ReceivableRouter | `0x89ff42862307145b92f5c6bf72772140e4bab57a` |
+| AverisHood | `0xa37135beeb44a9b0a9c59e552d60935f9babcea0` |
+| AverisPoolFactory | `0xff52e6bc002f3facff0317918bfd7e93525fe7ed` |
+| AverisAdapterRegistry | `0x5bdaa397a2d24de1e9e6c25f57c475e4c35c2f8b` |
+| AverisCredit | `0x0db85a8d55fa1bbb06f34219f72c65f17dbe10d8` |
+| AverisReserve | `0x9a025a6b3c31093fe16d60d7b48e527afb24b357` |
+| AverisACPAdapter | `0x2ad747c735cec953e3277e7b203b2c5b478da5f1` |
+
+Owner: `0x9651265f9f42ed719FFCf865eB4A232e176f7AFD`
+
+## Protocol parameters (current)
+
+| Parameter | Value |
+| --- | --- |
+| Advance rate | 40% (4000 bps) |
+| Financing fee | 2% (200 bps) |
+| Per-agent cap | 10,000 USDC |
+| Protocol maximum | 50,000 USDC |
+| Fee split | 70% LP / 20% treasury / 10% reserve |
+
+## Deploy from scratch (V2)
+
+1. Install [Foundry](https://book.getfoundry.sh/getting-started/installation) and [Bun](https://bun.sh).
+2. Run `forge test -vvv` — all 60 tests must pass.
+3. Set environment variables:
+   ```
+   ARC_RPC_URL=https://rpc.testnet.arc.io
+   ARC_USDC=0x3600000000000000000000000000000000000000
+   ARC_CHAIN_ID=1227
+   PRIVATE_KEY=0x...
+   ```
+4. Run:
+   ```sh
+   forge script script/DeployV2.s.sol:DeployV2 --rpc-url "$ARC_RPC_URL" --broadcast -vvvv
+   ```
+5. Copy emitted addresses to `.env`.
+6. Run wiring script:
+   ```sh
+   bun scripts/wire.mjs
+   ```
+7. Verify wiring with:
+   ```sh
+   bun scripts/set-advance-rate.mjs 4000
+   ```
+
+## Live services
+
+- **Frontend:** https://averisprotocol.xyz (Netlify)
+- **API:** https://api.averisprotocol.xyz (Railway)
+
+## API local development
 
 ```sh
-forge script script/Deploy.s.sol:Deploy --rpc-url "$ARC_RPC_URL" --broadcast -vvvv
+bun install
+bun start       # API on port 3001
 ```
-
-6. Record the emitted vault, ACP escrow, financing, and router addresses plus transaction hashes in `.env`, then verify source and ownership/parameters on Arcscan.
-7. Transfer owner roles to a multisig before accepting deposits. V1 lacks a timelock: add one before a public launch.
-
-## Publish for multiple users
-
-1. Set public frontend variables with the verified contract addresses and Arc RPC; add real contract reads/writes using an audited EIP-1193/Viem integration before enabling action buttons.
-2. Build: `npm run build`. Deploy `dist/` to Cloudflare Pages or Vercel. Set the build command to `npm run build` and publish directory to `dist`.
-3. Deploy `api/server.mjs` to a Node host (Render, Fly.io, Railway, or a container service). Set `PORT`, RPC URL, chain ID, and deployment addresses as host secrets.
-4. Put the API behind HTTPS on `api.your-domain.com`; put the frontend at `app.your-domain.com`; configure CORS only for that app domain once an indexer is implemented.
-5. Configure monitoring for RPC health, router settlement events, position defaults, vault liquidity, and API uptime. Back up indexed data; do not treat it as authoritative.
-6. Execute an end-to-end test with negligible test USDC: LP deposit → funded router-bound job → provider draw → escrow settlement → verify vault repayment and provider remainder.
 
 ## Mainnet gate
 
-Do not launch with real user funds until the escrow adapter, contracts, parameter governance, frontend transaction integration, and monitoring have had professional security review/audit. Arc mainnet addresses and configuration must be re-verified against official documentation at that time.
+Do not deploy to mainnet until:
+1. Third-party security audit completed
+2. Treasury replaced with Gnosis Safe multisig (`setTreasury(safeAddress)`)
+3. Owner roles transferred to multisig + timelock
+4. Vault seeded with real liquidity
+5. All contract addresses re-verified on Arc Mainnet
