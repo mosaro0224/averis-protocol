@@ -927,7 +927,7 @@ Generated: ${new Date().toISOString()}
 `.trim());
 });
 
-// POST /v1/mcp — MCP/1.0 tool dispatcher
+// POST /v1/mcp — MCP/1.0 tool dispatcher (legacy, kept for back-compat)
 app.post("/v1/mcp", (req, res) => {
   const ctx = {
     chainId:      ARC_CHAIN_ID,
@@ -940,6 +940,126 @@ app.post("/v1/mcp", (req, res) => {
   return handleMCP(req, res, ctx);
 });
 
+// ── Streamable HTTP MCP endpoint (/mcp) ───────────────────────────────────
+// Implements MCP 2025-03-26 Streamable HTTP transport for registry compliance.
+// POST  /mcp  — JSON-RPC messages (initialize, tools/list, tools/call)
+// GET   /mcp  — SSE stream for server-to-client notifications
+// DELETE /mcp — Session termination
+
+const mcpSessions = new Map(); // sessionId → { createdAt }
+
+function buildMcpCtx() {
+  return {
+    chainId:      ARC_CHAIN_ID,
+    contracts:    CONTRACTS,
+    publicClient,
+    discoveryDoc: buildDiscoveryDoc,
+    fetch: (path) => internalFetch("GET",  path, null),
+    post:  (path, body) => internalFetch("POST", path, body),
+  };
+}
+
+app.post("/mcp", async (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id");
+  const body = req.body || {};
+
+  // initialize — create a session
+  if (body.method === "initialize") {
+    const sessionId = `averis-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    mcpSessions.set(sessionId, { createdAt: Date.now() });
+    // Evict sessions older than 1 hour
+    for (const [id, s] of mcpSessions.entries()) {
+      if (Date.now() - s.createdAt > 3_600_000) mcpSessions.delete(id);
+    }
+    return res.json({
+      jsonrpc: "2.0",
+      id: body.id ?? null,
+      result: {
+        protocolVersion: "2025-03-26",
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: { name: "averis-protocol", version: "2.0.0" },
+        sessionId,
+      },
+    });
+  }
+
+  // All other methods — validate session if header present
+  const sessionId = req.headers["mcp-session-id"];
+  if (sessionId && !mcpSessions.has(sessionId)) {
+    return res.status(404).json({ jsonrpc: "2.0", id: body.id ?? null, error: { code: -32001, message: "Session not found" } });
+  }
+
+  // tools/list
+  if (body.method === "tools/list") {
+    return res.json({
+      jsonrpc: "2.0",
+      id: body.id ?? null,
+      result: {
+        tools: MCP_TOOLS.map((t) => ({
+          name:        t.name,
+          title:       t.title,
+          description: t.description,
+          inputSchema: t.inputSchema,
+          annotations: t.annotations,
+          ...(t["x-requires-auth"] ? { "x-requires-auth": true } : {}),
+        })),
+      },
+    });
+  }
+
+  // tools/call — delegate to existing MCP dispatcher
+  if (body.method === "tools/call") {
+    const ctx = buildMcpCtx();
+    // Wrap in a fake req/res that captures the MCP response
+    const fakeReq = { body: { method: "tools/call", params: body.params }, headers: req.headers };
+    let captured = null;
+    const fakeRes = {
+      _status: 200,
+      status(c) { this._status = c; return this; },
+      json(d)   { captured = d; return this; },
+    };
+    await handleMCP(fakeReq, fakeRes, ctx);
+    return res.json({
+      jsonrpc: "2.0",
+      id: body.id ?? null,
+      result: captured,
+    });
+  }
+
+  return res.status(400).json({
+    jsonrpc: "2.0",
+    id: body.id ?? null,
+    error: { code: -32601, message: `Method not found: ${body.method}` },
+  });
+});
+
+// GET /mcp — SSE stream for server-initiated notifications (required by spec)
+app.get("/mcp", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.write(`data: ${JSON.stringify({ type: "ping", server: "averis-protocol", version: "2.0.0" })}\n\n`);
+  const keepAlive = setInterval(() => res.write(": ping\n\n"), 30_000);
+  req.on("close", () => clearInterval(keepAlive));
+});
+
+// DELETE /mcp — session termination
+app.delete("/mcp", (req, res) => {
+  const sessionId = req.headers["mcp-session-id"];
+  if (sessionId) mcpSessions.delete(sessionId);
+  res.status(204).end();
+});
+
+// OPTIONS /mcp — CORS preflight
+app.options("/mcp", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id");
+  res.status(204).end();
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
@@ -949,7 +1069,10 @@ app.use((req, res) => {
     availableRoutes: [
       "GET  /health",
       "GET  /v1/discover                        [agent discovery]",
-      "POST /v1/mcp                             [MCP tools]",
+      "POST /mcp                                [MCP Streamable HTTP — registry standard]",
+      "GET  /mcp                                [MCP SSE stream]",
+      "DELETE /mcp                              [MCP session termination]",
+      "POST /v1/mcp                             [MCP/1.0 legacy tool dispatcher]",
       "GET  /.well-known/agent-card.json",
       "GET  /openapi.json",
       "GET  /robots.txt",

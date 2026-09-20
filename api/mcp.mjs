@@ -20,43 +20,40 @@ import { recoverTypedDataAddress } from "viem";
 export const MCP_TOOLS = [
   {
     name: "averis_discover",
+    title: "Discover Averis Protocol",
     description: "Discover Averis Protocol capabilities, contract addresses, financing parameters, authentication requirements, and the complete agent journey. Call this first to understand how to interact with Averis.",
     requiresAuth: false,
-    inputSchema: {
-      type: "object",
-      properties: {},
-      required: [],
-    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "averis_protocol_status",
+    title: "Protocol Status",
     description: "Get live protocol statistics: total value locked, available liquidity, outstanding principal, utilization rate, and Hood security status.",
     requiresAuth: false,
-    inputSchema: {
-      type: "object",
-      properties: {},
-      required: [],
-    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "averis_check_eligibility",
+    title: "Check Agent Eligibility",
     description: "Check whether an agent address is eligible for financing. Returns credit limit, current exposure, available credit, active job count, and remaining job slots.",
     requiresAuth: false,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
-        agentAddress: {
-          type: "string",
-          description: "Agent wallet address (0x...)",
-        },
+        agentAddress: { type: "string", description: "Agent wallet address (0x...)" },
       },
       required: ["agentAddress"],
     },
   },
   {
     name: "averis_verify_job",
+    title: "Verify Job Eligibility",
     description: "Verify a job is eligible for Averis financing. Checks that the job exists, is funded, has not expired, the agent is the provider, and the payout receiver is set to the ReceivableRouter (lien established). Returns the maximum advance amount.",
     requiresAuth: false,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -70,8 +67,10 @@ export const MCP_TOOLS = [
   },
   {
     name: "averis_get_quote",
+    title: "Get Financing Quote",
     description: "Get a financing quote for a job. Returns the approved amount, financing fee, total repayment obligation, and the on-chain calldata the agent must submit to create the spending pool.",
     requiresAuth: false,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -85,9 +84,11 @@ export const MCP_TOOLS = [
   },
   {
     name: "averis_request_funding",
+    title: "Request Funding (Authenticated)",
     description: "Validate a funding request and return the draw() calldata for the agent to submit on-chain. This creates the controlled spending pool. REQUIRES EIP-712 authentication: include agentAddress, nonce, expiry, and signature in arguments.",
     requiresAuth: true,
     "x-requires-auth": true,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -104,8 +105,10 @@ export const MCP_TOOLS = [
   },
   {
     name: "averis_pool_status",
+    title: "Spending Pool Status",
     description: "Get the current state of a job-specific spending pool: balance, amount spent, per-transaction limit, allowed recipients, expiry, and frozen status.",
     requiresAuth: false,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -116,8 +119,10 @@ export const MCP_TOOLS = [
   },
   {
     name: "averis_position_status",
+    title: "Financing Position Status",
     description: "Get the financing position for a job: principal, fee, repayment status, pool address, and whether the position is active, repaid, or in default.",
     requiresAuth: false,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -128,9 +133,11 @@ export const MCP_TOOLS = [
   },
   {
     name: "averis_repay",
+    title: "Repay Obligation (Authenticated)",
     description: "For OBLIGATION-mode financing positions (jobs without on-chain lien), returns the repayObligation() calldata the agent must submit after job settlement to repay principal and fee. Requires EIP-712 auth.",
     requiresAuth: true,
     "x-requires-auth": true,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -250,8 +257,10 @@ export async function handleMCP(req, res, ctx) {
     return res.json({
       tools: MCP_TOOLS.map((t) => ({
         name:              t.name,
+        title:             t.title,
         description:       t.description,
         inputSchema:       t.inputSchema,
+        annotations:       t.annotations,
         ...(t["x-requires-auth"] ? { "x-requires-auth": true } : {}),
       })),
     });
