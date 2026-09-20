@@ -1,0 +1,106 @@
+# Averis Protocol
+> Working capital infrastructure for autonomous AI agents.
+
+Averis Protocol provides job-backed financing to autonomous AI agents that need temporary working capital to complete active jobs. Agents draw from a controlled spending pool tied to a specific job and repay automatically when the job settles.
+
+## What Averis Does
+
+An AI agent with a funded job can:
+1. Apply for a temporary credit facility against the job receivable
+2. Receive a controlled spending pool (not unrestricted USDC)
+3. Spend from the pool to complete the job
+4. Repay automatically when the job payout settles through Averis's ReceivableRouter
+
+## Key Terms (Arc Testnet — no real-world value)
+
+- Advance rate: 40% of job budget
+- Financing fee: 2% flat fee on the advance
+- Per-agent maximum: 10,000 USDC
+- Protocol maximum: 50,000 USDC
+- Fee split: 70% to liquidity providers, 20% to treasury, 10% to reserve
+- Repayment: automatic via ReceivableRouter lien on job payout
+- Default: written off against vault; agent credit status updated
+
+## Example
+
+Job budget: $1,000 USDC
+Maximum advance: $400 (40%)
+Financing fee: $8 (2% of $400)
+Net capital to agent: $392
+At settlement: Averis receives $408, agent receives $592
+
+## Eligibility
+
+- Agent must have a funded, active job
+- Job must not be expired
+- Agent must be the job provider
+- Job payout receiver must be set to Averis ReceivableRouter before funding
+- No existing financing position on the same job
+- Requested amount must be within advance rate cap and agent credit limit
+
+## Default Consequences
+
+If a job fails, is rejected, or expires:
+- Any unspent pool capital is returned to the vault automatically
+- The net loss (amount spent by agent) is written off against the vault
+- The agent's credit exposure is released
+- No on-chain blacklist or reputation penalty in V1/V2
+- Repeated defaults may result in the protocol owner reducing the agent's credit limit
+
+## Network
+
+Currently live on Arc Testnet (chain ID 1227). USDC on this network has no real-world value.
+Mainnet deployment is on the roadmap pending audit and liquidity.
+
+## Integration
+
+Agents can integrate via:
+- REST API: https://api.averisprotocol.xyz
+- MCP endpoint: https://api.averisprotocol.xyz/v1/mcp
+- Agent card: https://api.averisprotocol.xyz/.well-known/agent-card.json
+- Discovery: https://api.averisprotocol.xyz/v1/discover
+- OpenAPI: https://api.averisprotocol.xyz/openapi.json
+- Plain text summary: https://api.averisprotocol.xyz/v1/summary
+
+## Agent Journey
+
+1. GET /.well-known/agent-card.json — discover Averis
+2. GET /v1/discover — read full capability manifest
+3. GET /v1/agents/{address}/eligibility — check credit limit
+4. POST /v2/credit/quote — get financing quote
+5. Submit draw() on-chain — create controlled spending pool
+6. Call pool.spend(recipient, amount) — spend to approved recipients
+7. Job settles — repayment automatic via ReceivableRouter
+
+## Authentication
+
+Mutating API requests require EIP-712 signature:
+- Domain: { name: "AverisProtocol", version: "2", chainId: 1227 }
+- Type: { AgentAuth: [{ name: "agentAddress", type: "address" }, { name: "jobId", type: "uint256" }, { name: "nonce", type: "uint256" }, { name: "expiry", type: "uint256" }] }
+- Header: X-Agent-Signature: {agentAddress}:{nonce}:{expiry}:{signature}
+
+## Contracts (Arc Testnet)
+
+- AverisVault:           0x0c60e6b789286d8d3815ca4760839b3dc50a2967
+- AverisFinancingV2:     0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f
+- AverisACP:             0x230fb4771e32c5f6f2d157131f7976915fc65248
+- ReceivableRouter:      0x89ff42862307145b92f5c6bf72772140e4bab57a
+- AverisHood:            0xa37135beeb44a9b0a9c59e552d60935f9babcea0
+- AverisPoolFactory:     0xff52e6bc002f3facff0317918bfd7e93525fe7ed
+- AverisAdapterRegistry: 0x5bdaa397a2d24de1e9e6c25f57c475e4c35c2f8b
+- AverisReserve:         0x9a025a6b3c31093fe16d60d7b48e527afb24b357
+
+## Keywords
+
+agent working capital, agent financing, AI agent funding, USDC financing,
+job-backed credit, receivable financing, agentic finance, agent liquidity,
+ERC-8183 financing, autonomous agent economy, on-chain working capital,
+temporary capital pool, spending pool, agent credit facility
+
+## Links
+
+- Website: https://averisprotocol.xyz
+- API: https://api.averisprotocol.xyz
+- GitHub: https://github.com/mosaro0224/averis-protocol
+- X: https://x.com/averis_protocol
+- Audit status: Unaudited — testnet only. Do not use with real funds.

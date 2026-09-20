@@ -1,0 +1,130 @@
+{
+  "schema": "https://a2a-protocol.org/schema/agent.json",
+  "version": "1.0",
+  "name": "Averis Protocol",
+  "description": "Working capital infrastructure for autonomous AI agents. Averis finances verified jobs so agents can complete work they have already been hired to do.",
+  "url": "https://averisprotocol.xyz",
+  "provider": {
+    "name": "Averis Protocol",
+    "url": "https://averisprotocol.xyz",
+    "contact": "https://x.com/averis_protocol"
+  },
+  "capabilities": [
+    {
+      "id": "agent_working_capital",
+      "name": "Agent Working Capital",
+      "description": "Provides temporary USDC financing to AI agents with active funded jobs",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "agentAddress": { "type": "string", "description": "Agent wallet address" },
+          "jobId": { "type": "string", "description": "Job ID on the escrow protocol" },
+          "protocol": { "type": "string", "description": "Job protocol contract address" },
+          "requestedAmount": { "type": "string", "description": "Requested USDC amount (6 decimals)" }
+        },
+        "required": ["agentAddress", "jobId", "protocol", "requestedAmount"]
+      }
+    },
+    {
+      "id": "financing_quote",
+      "name": "Financing Quote",
+      "description": "Returns a financing quote including approved amount, fee, and repayment terms",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "agentAddress": { "type": "string" },
+          "protocol": { "type": "string" },
+          "jobId": { "type": "string" },
+          "requestedAmount": { "type": "string" }
+        },
+        "required": ["agentAddress", "protocol", "jobId", "requestedAmount"]
+      }
+    },
+    {
+      "id": "eligibility_check",
+      "name": "Eligibility Check",
+      "description": "Checks an agent's credit limit, available capacity, and active exposure",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "agentAddress": { "type": "string" }
+        },
+        "required": ["agentAddress"]
+      }
+    },
+    {
+      "id": "position_status",
+      "name": "Position Status",
+      "description": "Returns the current status of a financing position for a specific job",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "jobId": { "type": "string" }
+        },
+        "required": ["jobId"]
+      }
+    },
+    {
+      "id": "pool_status",
+      "name": "Spending Pool Status",
+      "description": "Returns the status of a job-specific spending pool including balance, spent, expiry, and allowed recipients",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "jobId": { "type": "string" }
+        },
+        "required": ["jobId"]
+      }
+    }
+  ],
+  "interfaces": [
+    {
+      "type": "rest",
+      "url": "https://api.averisprotocol.xyz",
+      "spec": "https://api.averisprotocol.xyz/openapi.json"
+    },
+    {
+      "type": "mcp",
+      "url": "https://api.averisprotocol.xyz/v1/mcp",
+      "version": "1.0"
+    }
+  ],
+  "authentication": {
+    "type": "eip712",
+    "description": "EIP-712 typed data signature from the agent's wallet",
+    "domain": {
+      "name": "AverisProtocol",
+      "version": "2",
+      "chainId": 1227
+    },
+    "header": "X-Agent-Signature",
+    "format": "{agentAddress}:{nonce}:{expiry}:{signature}"
+  },
+  "network": {
+    "chain": "Arc Testnet",
+    "chainId": 1227,
+    "asset": "USDC",
+    "status": "testnet",
+    "note": "No real-world value. Mainnet deployment pending audit."
+  },
+  "keywords": [
+    "agent working capital",
+    "agent financing",
+    "AI agent funding",
+    "USDC financing",
+    "job-backed credit",
+    "receivable financing",
+    "agentic finance",
+    "agent liquidity",
+    "ERC-8183 financing",
+    "autonomous agent economy",
+    "spending pool",
+    "agent credit facility"
+  ],
+  "discovery": {
+    "agent_card": "https://api.averisprotocol.xyz/.well-known/agent-card.json",
+    "discover": "https://api.averisprotocol.xyz/v1/discover",
+    "summary": "https://api.averisprotocol.xyz/v1/summary",
+    "llms_txt": "https://averisprotocol.xyz/llms.txt"
+  }
+}
