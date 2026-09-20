@@ -65,19 +65,19 @@
     "example": {
       "job_budget_usdc": 1000,
       "max_advance_usdc": 400,
-      "financing_fee_usdc": 4,
+      "financing_fee_usdc": 8,
       "net_advance_to_agent_usdc": 392,
       "total_repayment_usdc": 408,
       "settlement_remainder_to_agent_usdc": 592,
-      "note": "Agent draws 400 USDC, pays 8 USDC fee (2%), receives net 392 USDC at draw time. At job settlement, ReceivableRouter repays 408 USDC (principal + fee) to the vault and releases the remaining 592 USDC to the agent."
+      "note": "Fee is charged ONCE at draw time (deducted from advance). Agent draws 400, fee of 8 (2%) is deducted, agent receives 392 net. At settlement, ReceivableRouter repays 408 (400 principal + 8 fee) to vault and releases 592 to agent. Total agent cost = 8 USDC, not 16."
     }
   },
 
   "protocol_status": {
     "note": "Live values read from chain at last agent-card update.",
     "hood_paused": false,
-    "vault_tvl_usdc": 0,
-    "vault_tvl_note": "Testnet — no LP deposits yet. Deposit USDC to the vault to provide liquidity.",
+    "vault_tvl_usdc": 60,
+    "vault_tvl_note": "Testnet — LP deposits active. Value reflects last agent-card update; live value at GET /v2/protocol.",
     "contracts_deployed": true,
     "contracts_wired": true,
     "adapter_registered": true

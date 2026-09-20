@@ -19,7 +19,7 @@ An AI agent with a funded job can:
 - Protocol maximum: 50,000 USDC
 - Fee split: 70% to liquidity providers, 20% to treasury, 10% to reserve
 - Repayment: automatic via ReceivableRouter lien on job payout
-- Default: written off against vault; agent credit status updated
+- Default: non-recourse — no personal liability, no on-chain blacklist. Unspent pool capital returned to vault automatically. Net loss written off against vault NAV. Repeated defaults may result in protocol owner reducing agent credit limit.
 
 ## Example
 
@@ -66,7 +66,7 @@ Agents can integrate via:
 
 1. GET /.well-known/agent-card.json — discover Averis
 2. GET /v1/discover — read full capability manifest
-3. GET /v1/agents/{address}/eligibility — check credit limit
+3. GET /v2/agents/:address — check credit profile and available limit
 4. POST /v2/credit/quote — get financing quote
 5. Submit draw() on-chain — create controlled spending pool
 6. Call pool.spend(recipient, amount) — spend to approved recipients
@@ -76,8 +76,9 @@ Agents can integrate via:
 
 Mutating API requests require EIP-712 signature:
 - Domain: { name: "AverisProtocol", version: "2", chainId: 1227 }
-- Type: { AgentAuth: [{ name: "agentAddress", type: "address" }, { name: "jobId", type: "uint256" }, { name: "nonce", type: "uint256" }, { name: "expiry", type: "uint256" }] }
-- Header: X-Agent-Signature: {agentAddress}:{nonce}:{expiry}:{signature}
+- Type: { AgentRequest: [{ name: "agentAddress", type: "address" }, { name: "nonce", type: "uint256" }, { name: "expiry", type: "uint256" }, { name: "chainId", type: "uint256" }] }
+- Header: X-Agent-Signature: {eip712-signature-hex}
+- Note: sign the typed-data hash; include agentAddress, nonce, expiry, chainId — no jobId in the signature
 
 ## Contracts (Arc Testnet)
 
@@ -88,7 +89,9 @@ Mutating API requests require EIP-712 signature:
 - AverisHood:            0xa37135beeb44a9b0a9c59e552d60935f9babcea0
 - AverisPoolFactory:     0xff52e6bc002f3facff0317918bfd7e93525fe7ed
 - AverisAdapterRegistry: 0x5bdaa397a2d24de1e9e6c25f57c475e4c35c2f8b
+- AverisCredit:          0x0db85a8d55fa1bbb06f34219f72c65f17dbe10d8
 - AverisReserve:         0x9a025a6b3c31093fe16d60d7b48e527afb24b357
+- AverisACPAdapter:      0x2ad747c735cec953e3277e7b203b2c5b478da5f1
 
 ## Keywords
 
