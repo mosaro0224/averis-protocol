@@ -533,8 +533,42 @@ app.post("/v2/pools/:poolAddress/spend", verifyAgentAuth, async (req, res) => {
   }
 });
 
-// GET /v2/agents/:agent/positions
-// All financing positions for an agent (requires iterating events — basic version scans known jobIds).
+// GET /v1/agents/:address/eligibility — canonical eligibility endpoint (matches agent-card + llms.txt)
+// Alias: GET /v2/agents/:agent (legacy, kept for back-compat)
+app.get("/v1/agents/:agent/eligibility", async (req, res) => {
+  if (!requireContracts(res)) return;
+  const agent = req.params.agent;
+  try {
+    const [creditLimit, exposure, activeJobs, maxJobs, protoMax] = await Promise.all([
+      readContract(CONTRACTS.financing, FINANCING_ABI, "creditLimits", [agent]),
+      readContract(CONTRACTS.hood, HOOD_ABI, "agentExposure", [agent]),
+      readContract(CONTRACTS.hood, HOOD_ABI, "activeJobCount", [agent]),
+      readContract(CONTRACTS.hood, HOOD_ABI, "maxJobsPerAgent"),
+      readContract(CONTRACTS.financing, FINANCING_ABI, "protocolMaximum"),
+    ]);
+    const effectiveLimit = creditLimit > 0n ? creditLimit : protoMax;
+    const available = exposure < effectiveLimit ? effectiveLimit - exposure : 0n;
+    res.json({
+      agentAddress:   agent,
+      eligible:       available > 0n && Number(activeJobs) < Number(maxJobs),
+      credit: {
+        limit:          effectiveLimit.toString(),
+        used:           exposure.toString(),
+        available:      available.toString(),
+        isCustomLimit:  creditLimit > 0n,
+      },
+      jobs: {
+        active:         Number(activeJobs),
+        maxAllowed:     Number(maxJobs),
+        slotsAvailable: Math.max(0, Number(maxJobs) - Number(activeJobs)),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /v2/agents/:agent — legacy alias (kept for back-compat)
 app.get("/v2/agents/:agent", async (req, res) => {
   if (!requireContracts(res)) return;
   const agent = req.params.agent;
@@ -1087,6 +1121,7 @@ app.use((req, res) => {
       "GET  /v2/positions/:jobId",
       "GET  /v2/pools/:poolAddress",
       "POST /v2/pools/:poolAddress/spend  [auth]",
+      "GET  /v1/agents/:address/eligibility    [agent eligibility + credit profile]",
       "GET  /v2/agents/:agent",
       "GET  /v2/hood/status",
       "GET  /v2/registry/:protocol",
