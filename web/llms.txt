@@ -24,10 +24,11 @@ An AI agent with a funded job can:
 ## Example
 
 Job budget: $1,000 USDC
-Maximum advance: $400 (40%)
-Financing fee: $8 (2% of $400)
-Net capital to agent: $392
-At settlement: Averis receives $408, agent receives $592
+Maximum advance: $400 (40% of budget, subject to agent credit limit, protocol maximum, and available vault liquidity — minimum of all four)
+Financing fee: $8 (2% of $400, added at repayment — NOT deducted at draw)
+Agent draws 400 and receives 400 in the controlled spending pool.
+At settlement: Averis receives $408 (principal $400 + fee $8), agent receives $592 plus any unspent pool balance.
+Total agent cost: $8 USDC.
 
 ## Eligibility
 
@@ -41,11 +42,12 @@ At settlement: Averis receives $408, agent receives $592
 ## Default Consequences
 
 If a job fails, is rejected, or expires:
-- Any unspent pool capital is returned to the vault automatically
-- The net loss (amount spent by agent) is written off against the vault
+- Any unspent pool capital is swept back to the vault automatically (balance-diff sweep)
+- The net loss (amount actually spent by agent) is written off against the vault NAV
 - The agent's credit exposure is released
-- No on-chain blacklist or reputation penalty in V1/V2
-- Repeated defaults may result in the protocol owner reducing the agent's credit limit
+- Non-recourse: no personal liability and no on-chain blacklist or reputation penalty
+- The protocol owner may reduce the agent's credit limit after repeated defaults. This is an off-chain governance action, not an automatic on-chain penalty.
+- Note: protocol terms (advance rate, fee, caps) are owner-adjustable on-chain at any time
 
 ## Network
 
@@ -66,21 +68,27 @@ Agents can integrate via:
 
 1. GET /.well-known/agent-card.json — discover Averis
 2. GET /v1/discover — read full capability manifest
-3. GET /v2/agents/:address — check credit profile and available limit
-4. POST /v2/credit/quote — get financing quote
-5. Submit draw() on-chain — create controlled spending pool
-6. Call pool.spend(recipient, amount) — spend to approved recipients
-7. Job settles — repayment automatic via ReceivableRouter
+3. GET /v1/agents/{address}/eligibility — check credit profile and available limit
+4. POST /v2/jobs/verify — confirm job is funded, active, and lien is correctly established
+5. POST /v2/credit/quote — get financing terms: approved amount, fee, total repayment
+6. Submit draw() on-chain — create controlled spending pool
+7. GET /v2/pools/:poolAddress — monitor pool balance, recipients, and expiry
+8. Call pool.spend(recipient, amount) — spend to approved recipients
+9. GET /v2/positions/:jobId — track financing position and repayment status
+10. Job settles — repayment automatic via ReceivableRouter (LIEN mode) or call repayObligation() (OBLIGATION mode)
 
 ## Authentication
 
-Mutating API requests require EIP-712 signature:
+Mutating API requests require EIP-712 signature over AgentRequest:
 - Domain: { name: "AverisProtocol", version: "2", chainId: 1227 }
-- Type: { AgentRequest: [{ name: "agentAddress", type: "address" }, { name: "nonce", type: "uint256" }, { name: "expiry", type: "uint256" }, { name: "chainId", type: "uint256" }] }
+- PrimaryType: AgentRequest
+- Types: { AgentRequest: [{ name: "agentAddress", type: "address" }, { name: "nonce", type: "uint256" }, { name: "expiry", type: "uint256" }, { name: "chainId", type: "uint256" }] }
 - Header: X-Agent-Signature: {eip712-signature-hex}
-- Note: sign the typed-data hash; include agentAddress, nonce, expiry, chainId — no jobId in the signature
+- Fields: agentAddress, nonce (per-agent monotonic), expiry (unix timestamp), chainId — no jobId in the signature
 
 ## Contracts (Arc Testnet)
+
+Note: These addresses are from the previous deployment. New addresses will be published after the next redeploy. For current addresses query GET /v1/discover.
 
 - AverisVault:           0x0c60e6b789286d8d3815ca4760839b3dc50a2967
 - AverisFinancingV2:     0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f

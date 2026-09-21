@@ -36,7 +36,7 @@ contract DeployV2 {
         AverisACPAdapter    acpAdapter
     ) {
         IERC20  usdc          = IERC20(vm.envAddress("ARC_USDC"));
-        address protocolOwner = vm.envAddress("PROTOCOL_OWNER");
+        address protocolOwner = vm.envAddress("PROTOCOL_OWNER"); // 0x4bAf1e5E3355f37539f423Ba251Dd7f98fE2Ea56
         uint256 expectedChain = vm.envUint("ARC_CHAIN_ID");
 
         require(

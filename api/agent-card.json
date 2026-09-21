@@ -66,18 +66,16 @@
       "job_budget_usdc": 1000,
       "max_advance_usdc": 400,
       "financing_fee_usdc": 8,
-      "net_advance_to_agent_usdc": 392,
+      "advance_to_pool_usdc": 400,
       "total_repayment_usdc": 408,
       "settlement_remainder_to_agent_usdc": 592,
-      "note": "Fee is charged ONCE at draw time (deducted from advance). Agent draws 400, fee of 8 (2%) is deducted, agent receives 392 net. At settlement, ReceivableRouter repays 408 (400 principal + 8 fee) to vault and releases 592 to agent. Total agent cost = 8 USDC, not 16."
+      "note": "Agent draws 400 and receives 400 in the controlled spending pool. No fee is deducted at draw. The 8 USDC fee (2%) is added at repayment. At settlement: Averis receives 408 (principal 400 + fee 8), agent receives 592 plus any unspent pool balance. Total agent cost = 8 USDC."
     }
   },
 
   "protocol_status": {
-    "note": "Live values read from chain at last agent-card update.",
-    "hood_paused": false,
-    "vault_tvl_usdc": 60,
-    "vault_tvl_note": "Testnet — LP deposits active. Value reflects last agent-card update; live value at GET /v2/protocol.",
+    "note": "Static values only. For live TVL, liquidity, and hood status query GET /v1/discover or the averis_protocol_status MCP tool.",
+    "live_status_endpoint": "https://api.averisprotocol.xyz/v1/discover",
     "contracts_deployed": true,
     "contracts_wired": true,
     "adapter_registered": true
@@ -87,12 +85,13 @@
     "Job must exist in a registered adapter protocol (AverisACP or ERC-8183 compatible)",
     "Job must be funded and active (status: FUNDED)",
     "Caller must be the job provider/agent address",
-    "Job payout receiver must be set to AverisReceivableRouter before funding",
+    "Job payout receiver must be set to AverisReceivableRouter before funding (LIEN mode) or agent must sign EIP-712 RepaymentObligation (OBLIGATION mode)",
     "Job must not have expired",
     "Job must not already have an active financing position",
-    "Agent exposure must not exceed per-agent cap (10,000 USDC)",
-    "Requested amount must not exceed 40% of job budget (advance_rate_bps = 4000)"
+    "Requested amount must not exceed the minimum of: 40% of job budget, the agent credit limit, the protocol maximum (50,000 USDC), and available vault liquidity"
   ],
+
+  "repayment_note": "Non-recourse financing. If a job fails, is rejected, or expires: unspent pool capital is swept back to vault automatically, net loss is written off against vault NAV, and agent exposure is released. No personal liability, no on-chain blacklist. The protocol owner may reduce an agent's credit limit after repeated defaults. Protocol terms (advance rate, fee, caps) are owner-adjustable.",
 
   "repayment": {
     "mode_lien": "Automatic — job settlement routed through ReceivableRouter → AverisFinancingV2 → vault. No agent action required.",
@@ -119,7 +118,7 @@
       "GET /.well-known/agent-card.json",
       "GET /openapi.json",
       "GET /health",
-      "GET /v2/agents/:address",
+      "GET /v1/agents/{address}/eligibility",
       "POST /v2/jobs/verify",
       "POST /v2/credit/quote",
       "GET /v2/positions/:jobId",
@@ -158,7 +157,7 @@
 
   "agent_journey": [
     { "step": 1, "action": "discover",    "endpoint": "GET /v1/discover",                  "auth": false, "description": "Get capabilities, contracts, live parameters, and auth instructions" },
-    { "step": 2, "action": "eligibility", "endpoint": "GET /v2/agents/:address",           "auth": false, "description": "Check credit profile, available credit, and active exposure" },
+    { "step": 2, "action": "eligibility", "endpoint": "GET /v1/agents/{address}/eligibility", "auth": false, "description": "Check credit profile, available credit, and active exposure" },
     { "step": 3, "action": "verify_job",  "endpoint": "POST /v2/jobs/verify",              "auth": false, "description": "Confirm job is funded, active, and lien is correctly established" },
     { "step": 4, "action": "quote",       "endpoint": "POST /v2/credit/quote",             "auth": false, "description": "Get financing terms: approved amount, fee, total repayment, expiry" },
     { "step": 5, "action": "fund",        "endpoint": "on-chain AverisFinancingV2.draw()", "auth": true,  "description": "Submit draw() transaction — creates job-specific controlled spending pool" },
