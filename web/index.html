@@ -1,9 +1,92 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Averis — Working capital for autonomous agents</title><link rel="stylesheet" href="./style.css"/></head>
-<body><main><nav><a class="brand" href="#top">AVERIS<span>•</span></a><div class="network"><i></i> ARC TESTNET</div><button id="connect">CONNECT WALLET</button></nav>
-<section class="hero" id="top"><p class="eyebrow">DECENTRALIZED WORKING CAPITAL</p><h1>WORKING CAPITAL<br/>FOR AUTONOMOUS AGENTS.</h1><p class="lede">Temporary liquidity against verified future job payments.</p><div class="actions"><a href="#app" class="primary">ENTER APP</a><a href="#protocol">VIEW PROTOCOL →</a></div></section>
-<section class="metrics" id="app"><article><label>TVL</label><strong data-chain="tvl">—</strong></article><article><label>AVAILABLE</label><strong data-chain="available">—</strong></article><article><label>UTILIZATION</label><strong data-chain="utilization">—</strong></article><article><label>ACTIVE FINANCING</label><strong data-chain="positions">—</strong></article></section>
-<section class="tabs"><button class="tab active" data-tab="vault">VAULT</button><button class="tab" data-tab="borrow">BORROW</button></section>
-<section id="vault" class="panel active"><header><p class="eyebrow">AVERIS VAULT</p><h2>USDC liquidity, non-custodial.</h2><p>Pool accounting is read from the deployed vault. Connect a wallet to supply or withdraw.</p></header><dl><div><dt>YOUR SUPPLIED LIQUIDITY</dt><dd>—</dd></div><div><dt>VAULT SHARES</dt><dd>—</dd></div><div><dt>EARNED FINANCING FEES</dt><dd>—</dd></div></dl><div class="callout">No contract configured. Set public deployment addresses to load on-chain data.</div><button class="primary" disabled>DEPOSIT USDC</button> <button disabled>WITHDRAW</button></section>
-<section id="borrow" class="panel"><header><p class="eyebrow">AGENT FACILITY</p><h2>Finance a specific receivable.</h2><p>Averis reads eligible funded jobs; it does not create, manage, or settle them.</p></header><div class="empty">CONNECT A WALLET TO DISCOVER ELIGIBLE JOBS<br/><small>Funding is released only to the job provider and repayment is limited to that job’s routed receivable.</small></div></section>
-<section class="protocol" id="protocol"><p class="eyebrow">THE PROTOCOL</p><div><span>01</span> LPs supply USDC to the vault.</div><div><span>02</span> A funded job names the Averis router as its immutable payout receiver.</div><div><span>03</span> The provider draws within an on-chain receivable cap.</div><div><span>04</span> Settlement repays principal + fee; the remainder goes to the agent.</div></section>
-<footer>AVERIS V2 <span>•</span> ARC TESTNET <span>•</span> <a href="https://averisprotocol.xyz" style="color:inherit">averisprotocol.xyz</a></footer></main><script src="./app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Averis — Working capital for autonomous agents</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+<main>
+  <nav>
+    <a class="brand" href="#top">AVERIS<span>•</span></a>
+    <div class="network"><i></i> ARC TESTNET</div>
+    <button id="connect">CONNECT WALLET</button>
+  </nav>
+
+  <section class="hero" id="top">
+    <p class="eyebrow">DECENTRALIZED WORKING CAPITAL</p>
+    <h1>WORKING CAPITAL<br/>FOR AUTONOMOUS AGENTS.</h1>
+    <p class="lede">Temporary liquidity against verified future job payments.</p>
+    <div class="actions">
+      <a href="#app" class="primary">ENTER APP</a>
+      <a href="#protocol">VIEW PROTOCOL →</a>
+    </div>
+  </section>
+
+  <section class="metrics" id="app">
+    <article><label>TVL</label><strong data-chain="tvl">—</strong></article>
+    <article><label>AVAILABLE</label><strong data-chain="available">—</strong></article>
+    <article><label>UTILIZATION</label><strong data-chain="utilization">—</strong></article>
+    <article><label>ACTIVE FINANCING</label><strong data-chain="positions">—</strong></article>
+  </section>
+
+  <section class="tabs">
+    <button class="tab active" data-tab="vault">VAULT</button>
+    <button class="tab" data-tab="borrow">BORROW</button>
+  </section>
+
+  <section id="vault" class="panel active">
+    <header>
+      <p class="eyebrow">AVERIS VAULT</p>
+      <h2>USDC liquidity, non-custodial.</h2>
+      <p>Supply USDC to the vault and earn financing fees. Connect a wallet to supply or withdraw.</p>
+    </header>
+    <dl>
+      <div><dt>YOUR SUPPLIED LIQUIDITY</dt><dd id="user-supplied">—</dd></div>
+      <div><dt>VAULT SHARES</dt><dd id="user-shares">—</dd></div>
+      <div><dt>EARNED FINANCING FEES</dt><dd id="user-fees">—</dd></div>
+    </dl>
+    <div class="input-row">
+      <input id="deposit-amount" type="number" min="0" step="1" placeholder="USDC AMOUNT" />
+      <button class="primary" id="btn-deposit" disabled>DEPOSIT USDC</button>
+    </div>
+    <div class="input-row" style="margin-top:12px">
+      <input id="withdraw-amount" type="number" min="0" step="1" placeholder="SHARES AMOUNT" />
+      <button id="btn-withdraw" disabled>WITHDRAW</button>
+    </div>
+    <p class="hint">Depositing mints vault shares proportional to current TVL. Withdrawing burns shares and returns USDC.</p>
+  </section>
+
+  <section id="borrow" class="panel">
+    <header>
+      <p class="eyebrow">AGENT FACILITY</p>
+      <h2>Finance a specific receivable.</h2>
+      <p>Averis reads eligible funded jobs; it does not create, manage, or settle them.</p>
+    </header>
+    <div class="empty">
+      CONNECT A WALLET TO DISCOVER ELIGIBLE JOBS<br/>
+      <small>Funding is released only to the job provider and repayment is limited to that job's routed receivable.</small>
+    </div>
+  </section>
+
+  <section class="protocol" id="protocol">
+    <p class="eyebrow">THE PROTOCOL</p>
+    <div><span>01</span> LPs supply USDC to the vault.</div>
+    <div><span>02</span> A funded job names the Averis router as its immutable payout receiver.</div>
+    <div><span>03</span> The provider draws within an on-chain receivable cap (up to 40% of job budget).</div>
+    <div><span>04</span> Settlement repays principal + 2% fee; the remainder plus any unspent pool balance goes to the agent.</div>
+  </section>
+
+  <footer>
+    AVERIS <span>•</span> ARC TESTNET <span>•</span>
+    <a href="https://averisprotocol.xyz" style="color:inherit">averisprotocol.xyz</a>
+  </footer>
+</main>
+
+<div id="toast-container"></div>
+
+<script src="./app.js"></script>
+</body>
+</html>
