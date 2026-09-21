@@ -46,6 +46,16 @@ contract AverisFinancingV2 {
     error ObligationExpired();
     error NonceReused();
     error AdapterInactive();
+    error Reentrancy();
+
+    // ── Reentrancy guard ──────────────────────────────────────────────────────
+    uint256 private _unlocked = 1;
+    modifier nonReentrant() {
+        if (_unlocked != 1) revert Reentrancy();
+        _unlocked = 2;
+        _;
+        _unlocked = 1;
+    }
 
     // ── Position states ───────────────────────────────────────────────────────
     enum Status { NONE, ACTIVE, REPAID, PARTIALLY_RECOVERED, DEFAULTED, EXPIRED }
@@ -258,7 +268,7 @@ contract AverisFinancingV2 {
         uint128   amount,
         bytes calldata obligationSig,
         address[] calldata recipients
-    ) external {
+    ) external nonReentrant {
         // 1. No double-financing
         if (positions[jobId].status != Status.NONE) revert ExistingPosition();
 
@@ -342,38 +352,48 @@ contract AverisFinancingV2 {
     // ── Repayment (called by ReceivableRouter — LIEN mode) ────────────────────
 
     /// @notice Receives settlement funds from ReceivableRouter and distributes:
-    ///   1. Principal → vault (LP capital returned).
-    ///   2. Fee split:
-    ///        lpBps      → vault (LP yield via receiveRepayment with feePaid portion)
-    ///        treasuryBps → treasury wallet
-    ///        reserveBps  → AverisReserve contract
-    ///   3. Remainder → agent.
-    function receivePayout(uint256 jobId, uint256 amount) external onlyRouter {
+    ///   1. Sweep unspent pool capital (balance-diff, no pre-read of remainingBalance).
+    ///   2. From (escrow payout + unspent): pay vault principal + fee first (shortfall
+    ///      handled — vault is always made whole before agent receives anything).
+    ///   3. Fee split: lpBps → vault, treasuryBps → treasury, reserveBps → reserve.
+    ///   4. True surplus (escrow remainder + unspent) → agent in one transfer.
+    ///   5. pool.freeze() on all paths.
+    function receivePayout(uint256 jobId, uint256 amount) external nonReentrant onlyRouter {
         Position storage p = positions[jobId];
         if (p.status != Status.ACTIVE) revert NotActive();
 
+        // ── Step 1: Sweep unspent pool capital (balance-diff) ─────────────────
+        AverisJobPool pool = AverisJobPool(p.poolAddress);
+        uint256 balBefore = asset.balanceOf(address(this));
+        pool.returnUnspent(address(this));
+        uint256 unspent = asset.balanceOf(address(this)) - balBefore;
+
+        // ── Step 2: Total available = escrow payout + unspent ─────────────────
+        uint256 totalAvailable = amount + unspent;
+        uint256 totalDue       = uint256(p.principal - p.principalRepaid)
+                               + uint256(p.fee       - p.feeRepaid);
+
+        uint256 toProtocol = totalAvailable < totalDue ? totalAvailable : totalDue;
+        uint256 toAgent    = totalAvailable - toProtocol;
+
+        // ── Step 3: Split protocol share into principal + fee ─────────────────
         uint256 principalDue  = p.principal - p.principalRepaid;
-        uint256 principalPaid = amount < principalDue ? amount : principalDue;
-        uint256 rest          = amount - principalPaid;
-        uint256 feeDue        = p.fee - p.feeRepaid;
-        uint256 feePaid       = rest < feeDue ? rest : feeDue;
+        uint256 principalPaid = toProtocol < principalDue ? toProtocol : principalDue;
+        uint256 feePaid       = toProtocol - principalPaid;
 
         p.principalRepaid += uint128(principalPaid);
         p.feeRepaid       += uint128(feePaid);
 
+        // ── Step 4: Distribute to vault / treasury / reserve ──────────────────
         if (principalPaid > 0 || feePaid > 0) {
-            // Split the fee portion across LP / treasury / reserve
             (uint256 lpFee, uint256 tFee, uint256 rFee) = _splitFee(feePaid);
 
-            // Principal + LP share of fee → vault
             uint256 toVault = principalPaid + lpFee;
             if (toVault > 0) {
                 asset.approve(address(vault), toVault);
                 vault.receiveRepayment(principalPaid, lpFee);
             }
-            // Treasury share
             if (tFee > 0) asset.safeTransfer(treasury, tFee);
-            // Reserve share
             if (rFee > 0) {
                 asset.approve(address(reserveFund), rFee);
                 reserveFund.receiveReserveFee(rFee);
@@ -383,23 +403,26 @@ contract AverisFinancingV2 {
             emit FeeDistributed(jobId, lpFee, tFee, rFee);
         }
 
-        // Surplus after principal + full fee → agent
-        if (amount > principalPaid + feePaid) {
-            asset.safeTransfer(p.agent, amount - principalPaid - feePaid);
-        }
+        // ── Step 5: Single transfer of escrow surplus + unspent to agent ──────
+        if (toAgent > 0) asset.safeTransfer(p.agent, toAgent);
+
+        // ── Step 6: Freeze pool (always) ──────────────────────────────────────
+        pool.freeze();
 
         if (p.principalRepaid == p.principal && p.feeRepaid == p.fee) {
             p.status = Status.REPAID;
             hood.releaseExposure(p.agent, p.principal);
         }
-        // Partial recovery: finalizeDefault() handles cleanup.
+        // Partial recovery: finalizeDefault() handles residual cleanup.
     }
 
     // ── OBLIGATION mode repayment ─────────────────────────────────────────────
 
     /// @notice Agent repays principal + fee directly for OBLIGATION-mode positions.
+    ///         Sweeps unspent pool capital (balance-diff) and returns it to the agent.
     ///         Fee is split 70/20/10 across vault (LP yield) / treasury / reserve.
-    function repayObligation(uint256 jobId) external {
+    ///         pool.freeze() is always called.
+    function repayObligation(uint256 jobId) external nonReentrant {
         Position storage p = positions[jobId];
         if (p.status != Status.ACTIVE) revert NotActive();
         if (p.repayMode != IJobAdapter.RepayMode.OBLIGATION) revert Unauthorized();
@@ -409,23 +432,33 @@ contract AverisFinancingV2 {
         uint128 feeDue       = p.fee       - p.feeRepaid;
         uint256 totalDue     = uint256(principalDue) + uint256(feeDue);
 
+        // Pull repayment from agent
         asset.safeTransferFrom(msg.sender, address(this), totalDue);
 
-        // Split fee
+        // ── Sweep unspent pool capital (balance-diff) ─────────────────────────
+        AverisJobPool pool = AverisJobPool(p.poolAddress);
+        uint256 balBefore = asset.balanceOf(address(this));
+        pool.returnUnspent(address(this));
+        uint256 unspent = asset.balanceOf(address(this)) - balBefore;
+
+        // ── Distribute: principal + fee to vault/treasury/reserve ─────────────
         (uint256 lpFee, uint256 tFee, uint256 rFee) = _splitFee(feeDue);
 
-        // Principal + LP fee share → vault
         uint256 toVault = uint256(principalDue) + lpFee;
         asset.approve(address(vault), toVault);
         vault.receiveRepayment(principalDue, lpFee);
 
-        // Treasury share
         if (tFee > 0) asset.safeTransfer(treasury, tFee);
-        // Reserve share
         if (rFee > 0) {
             asset.approve(address(reserveFund), rFee);
             reserveFund.receiveReserveFee(rFee);
         }
+
+        // ── Return unspent pool capital to agent ──────────────────────────────
+        if (unspent > 0) asset.safeTransfer(p.agent, unspent);
+
+        // ── Freeze pool (always) ──────────────────────────────────────────────
+        pool.freeze();
 
         p.principalRepaid = p.principal;
         p.feeRepaid       = p.fee;
