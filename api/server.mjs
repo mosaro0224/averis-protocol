@@ -687,6 +687,9 @@ async function getLiveParams() {
     const exampleBudget  = 1000;
     const exampleAdvance = +(exampleBudget * advPct / 100).toFixed(2);
     const exampleFee     = +(exampleAdvance * feePct / 100).toFixed(2);
+    // Version B mechanics: full advance deployed to pool (no deduction at draw).
+    // Fee is added at repayment. Agent receives full advance in pool.
+    // Settlement: vault receives advance + fee; agent receives remainder + any unspent pool balance.
     _liveParams = {
       advance_rate_pct:    advPct,
       advance_rate_bps:    Number(advBps),
@@ -705,13 +708,13 @@ async function getLiveParams() {
       },
       fee_split: { lp_pct: 70, treasury_pct: 20, reserve_pct: 10 },
       example: {
-        job_budget_usdc:                  exampleBudget,
-        max_advance_usdc:                 exampleAdvance,
-        financing_fee_usdc:               exampleFee,
-        net_advance_to_agent_usdc:        +(exampleAdvance - exampleFee).toFixed(2),
-        total_repayment_usdc:             +(exampleAdvance + exampleFee).toFixed(2),
+        job_budget_usdc:                    exampleBudget,
+        advance_to_pool_usdc:               exampleAdvance,
+        financing_fee_usdc:                 exampleFee,
+        agent_receives_at_draw_usdc:        exampleAdvance,
+        total_repayment_usdc:               +(exampleAdvance + exampleFee).toFixed(2),
         settlement_remainder_to_agent_usdc: +(exampleBudget - exampleAdvance - exampleFee).toFixed(2),
-        note: `Agent draws ${exampleAdvance} USDC, pays ${exampleFee} USDC fee, receives net ${+(exampleAdvance-exampleFee).toFixed(2)} USDC. At settlement agent keeps ${+(exampleBudget-exampleAdvance-exampleFee).toFixed(2)} USDC.`,
+        note: `Agent draws ${exampleAdvance} USDC and receives ${exampleAdvance} USDC in pool (no deduction at draw). The ${exampleFee} USDC fee (${feePct}%) is added at repayment. At settlement: Averis receives ${+(exampleAdvance+exampleFee).toFixed(2)} USDC, agent receives ${+(exampleBudget-exampleAdvance-exampleFee).toFixed(2)} USDC plus any unspent pool balance.`,
       },
       fetched_at: new Date().toISOString(),
     };
@@ -855,14 +858,14 @@ Total vault assets:    ${tvl.toFixed(2)} USDC
 Available to lend:     ${avail.toFixed(2)} USDC
 Note: ${p.vault?.note ?? "See /v2/protocol for full vault status."}
 
-WORKED EXAMPLE
---------------
-Job budget:                 ${ex.job_budget_usdc ?? 1000} USDC
-Maximum advance (${advPct}%):     ${ex.max_advance_usdc ?? (1000*advPct/100)} USDC
-Financing fee (${feePct}%):       ${ex.financing_fee_usdc ?? (1000*advPct/100*feePct/100)} USDC
-Net to agent at draw:       ${ex.net_advance_to_agent_usdc ?? (1000*advPct/100*(1-feePct/100))} USDC
-Total repayment:            ${ex.total_repayment_usdc ?? (1000*advPct/100*(1+feePct/100))} USDC
-Agent keeps at settlement:  ${ex.settlement_remainder_to_agent_usdc ?? (1000-1000*advPct/100*(1+feePct/100))} USDC
+WORKED EXAMPLE (Version B: full advance to pool, fee added at repayment)
+------------------------------------------------------------------------
+Job budget:                   ${ex.job_budget_usdc ?? 1000} USDC
+Advance to pool (${advPct}%):      ${ex.advance_to_pool_usdc ?? (1000*advPct/100)} USDC
+Agent receives at draw:       ${ex.agent_receives_at_draw_usdc ?? (1000*advPct/100)} USDC (full advance, no deduction)
+Financing fee (${feePct}% at repay): ${ex.financing_fee_usdc ?? (1000*advPct/100*feePct/100)} USDC
+Total repayment:              ${ex.total_repayment_usdc ?? (1000*advPct/100*(1+feePct/100))} USDC
+Agent keeps at settlement:    ${ex.settlement_remainder_to_agent_usdc ?? (1000-1000*advPct/100*(1+feePct/100))} USDC plus any unspent pool balance
 
 ELIGIBILITY REQUIREMENTS
 -------------------------
@@ -913,15 +916,16 @@ IMPORTANT NOTES
 - Vault currently holds ${tvl.toFixed(2)} USDC. Financing requires LP deposits.
 - Mainnet deployment is on the roadmap after audit and vault seeding.
 
-Contract addresses:
-  AverisVault:           0x0c60e6b789286d8d3815ca4760839b3dc50a2967
-  AverisFinancingV2:     0x20429b8d5eef0bfbfb1d14eb8b2a1ce94817b36f
-  AverisACP:             0x230fb4771e32c5f6f2d157131f7976915fc65248
-  ReceivableRouter:      0x89ff42862307145b92f5c6bf72772140e4bab57a
-  AverisHood:            0xa37135beeb44a9b0a9c59e552d60935f9babcea0
-  AverisPoolFactory:     0xff52e6bc002f3facff0317918bfd7e93525fe7ed
-  AverisAdapterRegistry: 0x5bdaa397a2d24de1e9e6c25f57c475e4c35c2f8b
-  AverisReserve:         0x9a025a6b3c31093fe16d60d7b48e527afb24b357
+Contract addresses (current deployment — always current, pulled from env):
+  AverisVault:           ${CONTRACTS.vault       || "(not set)"}
+  AverisFinancingV2:     ${CONTRACTS.financing   || "(not set)"}
+  AverisACP:             ${CONTRACTS.acp         || "(not set)"}
+  ReceivableRouter:      ${CONTRACTS.router      || "(not set)"}
+  AverisHood:            ${CONTRACTS.hood        || "(not set)"}
+  AverisPoolFactory:     ${CONTRACTS.factory     || "(not set)"}
+  AverisAdapterRegistry: ${CONTRACTS.registry    || "(not set)"}
+  AverisCredit:          ${CONTRACTS.credit      || "(not set)"}
+Query GET /v1/discover for the full contract table including AverisReserve and AverisACPAdapter.
 
 Generated: ${new Date().toISOString()}
 `.trim());
