@@ -74,10 +74,27 @@ NONE → ACTIVE → REPAID
 
 ## Chain
 
-- Network: Arc Testnet (chain ID 1227)
+- Network: Arc Testnet (chain ID 5042002)
 - RPC: `https://rpc.testnet.arc.io`
 - Explorer: `https://explorer.testnet.arc.io`
 - USDC: `0x3600000000000000000000000000000000000000` (native gas token = USDC on Arc)
+
+## Deployed addresses (2026-09-21)
+
+| Contract | Address |
+| --- | --- |
+| AverisVault | `0xf7F47493E2f042a428a531724bE62854002979cA` |
+| AverisFinancingV2 | `0x102eC41EDdeed916012D7B345c42e7Be64AD2051` |
+| AverisACP | `0x3477e203fCFFbfe0E419E230d115d7C80A22BB18` |
+| ReceivableRouter | `0x0b2C571D2FD5199b758d426340CF8260515eFF15` |
+| AverisHood | `0xd7D8633804FfdB3504Ba6F8036b26536f3d89E0a` |
+| AverisPoolFactory | `0x69e875801822ffcA3C34022a2E2363d26688259a` |
+| AverisAdapterRegistry | `0x0D6DBfaeAf74b45642064E6bA27F02c69872f4B0` |
+| AverisCredit | `0x9330790C74E71f16ef568c4CD6ca06662A611dd9` |
+| AverisReserve | `0x9069f069467578c1F4B6f2385c6B52Ca86f8DDf5` |
+| AverisACPAdapter | `0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A` |
+
+Owner: `0x4bAf1e5E3355f37539f423Ba251Dd7f98fE2Ea56`
 
 ## Limitations (testnet)
 

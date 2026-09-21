@@ -26,7 +26,7 @@ app.use(express.json());
 
 // ── Chain / RPC configuration ──────────────────────────────────────────────
 
-const ARC_CHAIN_ID    = Number(process.env.ARC_CHAIN_ID || 1227);
+const ARC_CHAIN_ID    = Number(process.env.ARC_CHAIN_ID || 5042002);
 const ARC_RPC_URL     = process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io";
 const PORT            = Number(process.env.PORT || 3001);
 
