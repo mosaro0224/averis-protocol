@@ -95,14 +95,14 @@
     "domain": {
       "name": "AverisProtocol",
       "version": "2",
-      "chainId": 5042002
+      "chainId": 1227
     },
     "header": "X-Agent-Signature",
     "format": "{agentAddress}:{nonce}:{expiry}:{signature}"
   },
   "network": {
     "chain": "Arc Testnet",
-    "chainId": 5042002,
+    "chainId": 1227,
     "asset": "USDC",
     "status": "testnet",
     "note": "No real-world value. Mainnet deployment pending audit."

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Averis Protocol — For Agents</title>
+  <meta name="description" content="Averis Protocol provides working capital to autonomous AI agents executing active jobs. Discover, apply, and integrate in 5 steps.">
+  <meta name="keywords" content="agent working capital, agent financing, AI agent funding, USDC financing, job-backed credit, receivable financing, agentic finance, agent liquidity, ERC-8183 financing, autonomous agent economy, spending pool">
+  <meta name="robots" content="index, follow">
+  <meta name="ai-agent" content="discoverable">
+  <meta name="agent-capability" content="agent_working_capital, usdc_financing, erc8183_financing">
+  <link rel="canonical" href="https://averisprotocol.xyz/for-agents">
+  <style>
+    body { font-family: 'Courier New', monospace; background: #050a07; color: #e2e8e4; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.7; }
+    h1 { color: #4a9eff; font-size: 2rem; margin-bottom: 0.25rem; }
+    h2 { color: #7ec8a0; border-bottom: 1px solid #1a2e1f; padding-bottom: 8px; margin-top: 2.5rem; }
+    h3 { color: #a8d5b8; }
+    code { background: #0d1f14; padding: 2px 8px; border-radius: 4px; color: #7ec8a0; font-size: 0.9em; }
+    pre { background: #0d1f14; padding: 20px; border-radius: 8px; overflow-x: auto; border-left: 3px solid #4a9eff; }
+    pre code { background: none; padding: 0; }
+    a { color: #4a9eff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .tag { display: inline-block; background: #0d1f14; border: 1px solid #1a3a22; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; color: #7ec8a0; margin: 2px; }
+    .warning { background: #1a1200; border-left: 3px solid #f5a623; padding: 12px 20px; border-radius: 4px; color: #f5c842; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th { text-align: left; color: #7ec8a0; border-bottom: 1px solid #1a3a22; padding: 8px 12px; }
+    td { padding: 8px 12px; border-bottom: 1px solid #0d1f14; }
+  </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebAPI",
+    "name": "Averis Protocol Agent API",
+    "description": "Working capital infrastructure for autonomous AI agents. Job-backed financing with controlled spending pools and automatic repayment.",
+    "url": "https://api.averisprotocol.xyz",
+    "documentation": "https://averisprotocol.xyz/for-agents",
+    "provider": { "@type": "Organization", "name": "Averis Protocol", "url": "https://averisprotocol.xyz" },
+    "termsOfService": "https://averisprotocol.xyz",
+    "keywords": "agent working capital, agent financing, AI agent funding, USDC financing, job-backed credit"
+  }
+  </script>
+</head>
+<body>
+
+<h1>Averis Protocol</h1>
+<p style="color:#7ec8a0; font-size:1.1rem; margin-top:0">Working capital for autonomous AI agents.</p>
+
+<div class="warning">
+  ⚠ Currently live on Arc Testnet only. USDC has no real-world value. Mainnet deployment pending audit.
+</div>
+
+<h2>What Averis Does</h2>
+<p>
+  If you are an autonomous agent with an active funded job and a temporary capital shortfall,
+  Averis lends you working capital against the job receivable. You spend from a controlled pool,
+  complete the job, and repayment happens automatically when the job settles.
+</p>
+<p>You do not need collateral beyond the job itself. You do not need a human co-signer.</p>
+
+<h2>Discovery Endpoints</h2>
+<table>
+  <tr><th>Path</th><th>Format</th><th>Use</th></tr>
+  <tr><td><code>/.well-known/agent-card.json</code></td><td>JSON</td><td>Machine-readable capability manifest</td></tr>
+  <tr><td><code>/v1/discover</code></td><td>JSON</td><td>Full integration guide + live protocol state</td></tr>
+  <tr><td><code>/v1/mcp</code></td><td>MCP/1.0</td><td>MCP tool dispatcher (9 tools)</td></tr>
+  <tr><td><code>/openapi.json</code></td><td>OpenAPI 3.1</td><td>Full API spec for auto-client generation</td></tr>
+  <tr><td><code>/v1/summary</code></td><td>Plain text</td><td>LLM-readable single-pass summary</td></tr>
+  <tr><td><code>/llms.txt</code></td><td>Plain text</td><td>LLM crawler index (averisprotocol.xyz/llms.txt)</td></tr>
+</table>
+
+<h2>5-Step Integration</h2>
+
+<h3>Step 1 — Check eligibility</h3>
+<pre><code>GET https://api.averisprotocol.xyz/v1/agents/YOUR_ADDRESS/eligibility</code></pre>
+<p>Returns your credit limit, available capacity, and active exposure.</p>
+
+<h3>Step 2 — Get a quote</h3>
+<pre><code>POST https://api.averisprotocol.xyz/v2/credit/quote
+{
+  "agentAddress": "0xYOUR_ADDRESS",
+  "protocol":     "0xACP_CONTRACT",
+  "jobId":        "42",
+  "requestedAmount": "400000000"
+}</code></pre>
+<p>Returns approved amount, fee, total repayment, and expiry.</p>
+
+<h3>Step 3 — Draw capital (on-chain)</h3>
+<pre><code>POST https://api.averisprotocol.xyz/v1/credit/fund
+{
+  "agentAddress":      "0xYOUR_ADDRESS",
+  "protocol":          "0xACP_CONTRACT",
+  "jobId":             "42",
+  "amount":            "400000000",
+  "allowedRecipients": ["0xRECIPIENT_1", "0xRECIPIENT_2"],
+  "perTxLimit":        "100000000",
+  "signature":         "0xSIG",
+  "nonce":             1,
+  "expiry":            1758000000
+}</code></pre>
+<p>Returns <code>draw()</code> calldata. Submit this transaction from your wallet to create the spending pool.</p>
+
+<h3>Step 4 — Spend from pool</h3>
+<pre><code>// Call directly on the pool contract:
+AverisJobPool.spend(recipient, amount, purpose)</code></pre>
+<p>Only allowed recipients, within per-tx limit, before expiry.</p>
+
+<h3>Step 5 — Job settles, repayment automatic</h3>
+<p>When the evaluator calls <code>complete()</code> on the job escrow, the settlement routes through <code>ReceivableRouter</code> → <code>AverisFinancingV2.receivePayout()</code> → vault receives principal + fee → you receive the remainder. No manual repayment step.</p>
+
+<h2>Authentication</h2>
+<p>Mutating requests require an EIP-712 signature in the <code>X-Agent-Signature</code> header:</p>
+<pre><code>// TypeScript (viem)
+import { signTypedData } from 'viem/accounts'
+
+const sig = await signTypedData({
+  privateKey: AGENT_PRIVATE_KEY,
+  domain: { name: 'AverisProtocol', version: '2', chainId: 1227 },
+  types: {
+    AgentAuth: [
+      { name: 'agentAddress', type: 'address' },
+      { name: 'jobId',        type: 'uint256' },
+      { name: 'nonce',        type: 'uint256' },
+      { name: 'expiry',       type: 'uint256' },
+    ]
+  },
+  primaryType: 'AgentAuth',
+  message: { agentAddress: AGENT_ADDRESS, jobId: JOB_ID, nonce: NONCE, expiry: EXPIRY }
+})
+
+// Header format:
+// X-Agent-Signature: {agentAddress}:{nonce}:{expiry}:{sig}
+</code></pre>
+
+<h2>MCP Tools</h2>
+<pre><code>POST https://api.averisprotocol.xyz/v1/mcp
+{ "method": "tools/list" }</code></pre>
+<p>Available tools: <code>averis_discover</code>, <code>averis_protocol_status</code>, <code>averis_check_eligibility</code>, <code>averis_get_quote</code>, <code>averis_request_funding</code>, <code>averis_pool_status</code>, <code>averis_position_status</code>, <code>averis_repay</code>, <code>averis_protocol_status</code></p>
+
+<h2>Financing Terms</h2>
+<table>
+  <tr><th>Parameter</th><th>Value</th></tr>
+  <tr><td>Advance rate</td><td>40% of job budget</td></tr>
+  <tr><td>Financing fee</td><td>2% flat fee on advance</td></tr>
+  <tr><td>Per-agent cap</td><td>10,000 USDC</td></tr>
+  <tr><td>Protocol maximum</td><td>50,000 USDC</td></tr>
+  <tr><td>Fee split</td><td>70% LP / 20% treasury / 10% reserve</td></tr>
+  <tr><td>Repayment</td><td>Automatic via ReceivableRouter lien</td></tr>
+</table>
+
+<h2>Pre-conditions</h2>
+<ul>
+  <li>Job must be funded and active on a supported protocol</li>
+  <li>You must be the job provider</li>
+  <li>Job payout receiver must be set to <code>ReceivableRouter</code> before funding</li>
+  <li>No existing financing position on this job</li>
+  <li>Requested amount within advance rate cap and your credit limit</li>
+</ul>
+
+<h2>Keywords</h2>
+<p>
+  <span class="tag">agent working capital</span>
+  <span class="tag">agent financing</span>
+  <span class="tag">AI agent funding</span>
+  <span class="tag">USDC financing</span>
+  <span class="tag">job-backed credit</span>
+  <span class="tag">receivable financing</span>
+  <span class="tag">agentic finance</span>
+  <span class="tag">agent liquidity</span>
+  <span class="tag">ERC-8183 financing</span>
+  <span class="tag">autonomous agent economy</span>
+  <span class="tag">spending pool</span>
+  <span class="tag">agent credit facility</span>
+</p>
+
+<h2>Links</h2>
+<ul>
+  <li><a href="https://averisprotocol.xyz">averisprotocol.xyz</a> — main site</li>
+  <li><a href="https://api.averisprotocol.xyz/v1/discover">api.averisprotocol.xyz/v1/discover</a> — discovery endpoint</li>
+  <li><a href="https://api.averisprotocol.xyz/openapi.json">api.averisprotocol.xyz/openapi.json</a> — OpenAPI spec</li>
+  <li><a href="https://github.com/mosaro0224/averis-protocol">github.com/mosaro0224/averis-protocol</a> — source code</li>
+  <li><a href="https://x.com/averis_protocol">x.com/averis_protocol</a> — X</li>
+</ul>
+
+</body>
+</html>

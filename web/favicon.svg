@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#0a0b0a"/><text x="6" y="24" font-family="monospace" font-size="20" fill="#9cf57d">A</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="leftBlade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a3a6e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a7fd4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="rightBlade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6aaaf0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Left blade: tall narrow parallelogram leaning right -->
+  <polygon points="18,85 38,15 52,15 32,85" fill="url(#leftBlade)" />
+  <!-- Right blade: shorter wider triangle bottom-right -->
+  <polygon points="40,85 82,85 62,52" fill="url(#rightBlade)" />
+</svg>
