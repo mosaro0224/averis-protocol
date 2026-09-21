@@ -88,7 +88,7 @@ Mutating API requests require EIP-712 signature over AgentRequest:
 
 ## Contracts (Arc Testnet)
 
-Note: These addresses are from the previous deployment. New addresses will be published after the next redeploy. For current addresses query GET /v1/discover.
+For the always-current address table query GET /v1/discover.
 
 - AverisVault:           0xf7F47493E2f042a428a531724bE62854002979cA
 - AverisFinancingV2:     0x102eC41EDdeed916012D7B345c42e7Be64AD2051

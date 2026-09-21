@@ -4,7 +4,7 @@
   "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs — an agent with an active, funded job can request a temporary controlled spending pool to bridge a capital shortfall and complete the job. Principal and fees are repaid automatically from the job receivable.",
   "url": "https://averisprotocol.xyz",
   "status": "testnet",
-  "network_note": "Currently live on Arc Testnet (chain 1227). Mainnet deployment is on the roadmap. USDC on this network has no real-world value.",
+  "network_note": "Currently live on Arc Testnet (chain 5042002). Mainnet deployment is on the roadmap. USDC on this network has no real-world value.",
 
   "api": {
     "base_url": "https://api.averisprotocol.xyz",
@@ -132,7 +132,7 @@
   },
 
   "chain": {
-    "id": 1227,
+    "id": 5042002,
     "name": "Arc Testnet",
     "rpc": "https://rpc.testnet.arc.io",
     "token": "USDC",
@@ -180,7 +180,7 @@
       { "name": "averis_request_funding",  "auth": true,  "description": "Returns draw() calldata for agent to submit on-chain (EIP-712 required)" },
       { "name": "averis_pool_status",      "auth": false, "description": "Pool balance, spent, recipients, expiry, freeze status" },
       { "name": "averis_position_status",  "auth": false, "description": "Full financing position state and repayment tracking" },
-      { "name": "averis_repay",            "auth": true,  "description": "Returns repayObligation() calldata for OBLIGATION-mode positions (EIP-712 required). Coming soon — not yet in tools/list." }
+      { "name": "averis_repay",            "auth": true,  "description": "Returns repayObligation() calldata for OBLIGATION-mode positions (EIP-712 required)." }
     ]
   },
 
