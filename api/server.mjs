@@ -195,6 +195,7 @@ async function readContract(address, abi, functionName, args = []) {
 
 // GET /health
 app.get("/health", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   let chainOk = false;
   let blockNumber = null;
   try {
@@ -365,29 +366,48 @@ app.post("/v2/credit/quote", async (req, res) => {
   }
 
   try {
-    const [maxAdvance, feeBps, advanceRate] = await Promise.all([
+    const [maxAdvance, feeBps, advanceRate, protocolMax, blockNumber] = await Promise.all([
       readContract(CONTRACTS.financing, FINANCING_ABI, "maxAdvance", [protocol, BigInt(jobId), BigInt(requestedAmount)]),
       readContract(CONTRACTS.financing, FINANCING_ABI, "feeBps"),
       readContract(CONTRACTS.financing, FINANCING_ABI, "advanceRateBps"),
+      readContract(CONTRACTS.financing, FINANCING_ABI, "protocolMaximum"),
+      publicClient.getBlockNumber(),
     ]);
 
     const approved  = maxAdvance < BigInt(requestedAmount) ? maxAdvance : BigInt(requestedAmount);
     const fee       = (approved * feeBps) / 10000n;
     const totalOwed = approved + fee;
 
-    // The quote itself is unsigned — agent submits draw() on-chain.
-    // The on-chain draw() enforces all limits deterministically.
+    // terms_hash: keccak256 of the three owner-adjustable parameters read at quote time.
+    // Agents should verify terms_hash hasn't changed before signing draw().
+    // If terms change between quote and draw, draw() enforces new terms on-chain.
+    const termsHash = keccak256(encodePacked(
+      ["uint256", "uint256", "uint256"],
+      [advanceRate, feeBps, protocolMax]
+    ));
+
+    // quote expires in ~5 minutes (600 blocks at 500ms block time)
+    const quoteExpiryBlock = blockNumber + 600n;
+    const quotedAt = new Date().toISOString();
+
+    res.setHeader("Cache-Control", "no-store, max-age=0");
     res.json({
       agentAddress,
       protocol,
       jobId:           jobId.toString(),
       requestedAmount: requestedAmount.toString(),
+      quoted_at:       quotedAt,
+      quoted_at_block: blockNumber.toString(),
+      expires_at_block: quoteExpiryBlock.toString(),
+      terms_hash:      termsHash,
+      terms_hash_note: "Hash of advanceRateBps + feeBps + protocolMaximum at quote time. If terms change before draw(), this hash changes. Verify on-chain via AverisFinancingV2 before signing.",
       quote: {
         approvedAmount:  approved.toString(),
         fee:             fee.toString(),
         totalRepayment:  totalOwed.toString(),
         feeBps:          feeBps.toString(),
         advanceRateBps:  advanceRate.toString(),
+        protocolMaximum: protocolMax.toString(),
         maxAvailable:    maxAdvance.toString(),
       },
       // Agent calls AverisFinancingV2.draw(protocol, jobId, approved, allowedRecipients, perTxLimit)
@@ -817,6 +837,7 @@ function buildDiscoveryDoc(liveParams) {
 app.get("/.well-known/agent-card.json", (_req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   res.json(AGENT_CARD);
 });
 
@@ -847,6 +868,7 @@ app.get("/robots.txt", (_req, res) => {
 // GET /v1/discover — machine-readable capability discovery entry point
 app.get("/v1/discover", async (_req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   const liveParams = await getLiveParams();
   res.json(buildDiscoveryDoc(liveParams));
 });

@@ -161,7 +161,7 @@
     { "step": 1, "action": "discover",    "endpoint": "GET /v1/discover",                  "auth": false, "description": "Get capabilities, contracts, live parameters, and auth instructions" },
     { "step": 2, "action": "eligibility", "endpoint": "GET /v1/agents/{address}/eligibility", "auth": false, "description": "Check credit profile, available credit, and active exposure" },
     { "step": 3, "action": "verify_job",  "endpoint": "POST /v2/jobs/verify",              "auth": false, "description": "Confirm job is funded, active, and lien is correctly established" },
-    { "step": 4, "action": "quote",       "endpoint": "POST /v2/credit/quote",             "auth": false, "description": "Get financing terms: approved amount, fee, total repayment, expiry" },
+    { "step": 4, "action": "quote",       "endpoint": "POST /v2/credit/quote",             "auth": false, "description": "Get financing terms: approved amount, fee, total repayment, expiry, and terms_hash. Verify terms_hash hasn't changed before submitting draw()." },
     { "step": 5, "action": "fund",        "endpoint": "on-chain AverisFinancingV2.draw()", "auth": true,  "description": "Submit draw() transaction — creates job-specific controlled spending pool" },
     { "step": 6, "action": "pool_status", "endpoint": "GET /v2/pools/:poolAddress",        "auth": false, "description": "Monitor pool balance, spending limits, allowed recipients, and expiry" },
     { "step": 7, "action": "spend",       "endpoint": "POST /v2/pools/:poolAddress/spend", "auth": true,  "description": "Get validated spend() calldata — agent submits from its own wallet" },

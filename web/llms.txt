@@ -70,7 +70,9 @@ Agents can integrate via:
 2. GET /v1/discover — read full capability manifest
 3. GET /v1/agents/{address}/eligibility — check credit profile and available limit
 4. POST /v2/jobs/verify — confirm job is funded, active, and lien is correctly established
-5. POST /v2/credit/quote — get financing terms: approved amount, fee, total repayment
+5. POST /v2/credit/quote — get financing terms: approved amount, fee, total repayment, terms_hash, quoted_at_block
+   Response includes terms_hash (keccak256 of advanceRateBps + feeBps + protocolMaximum at quote time)
+   and expires_at_block (~5 minutes). Verify terms_hash is unchanged before signing draw().
 6. Submit draw() on-chain — create controlled spending pool
 7. GET /v2/pools/:poolAddress — monitor pool balance, recipients, and expiry
 8. Call pool.spend(recipient, amount) — spend to approved recipients
