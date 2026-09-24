@@ -1,17 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 88" fill="none">
   <defs>
-    <linearGradient id="leftBlade" x1="30%" y1="0%" x2="70%" y2="100%">
-      <stop offset="0%" style="stop-color:#d0e4ff;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#6aaaf0;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#2060c8;stop-opacity:1" />
+    <!-- Left stroke gradient: white/lavender top-right → strong blue bottom-left -->
+    <linearGradient id="lg" x1="72" y1="4" x2="12" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#eef0ff"/>
+      <stop offset="40%"  stop-color="#8899ff"/>
+      <stop offset="100%" stop-color="#3344ee"/>
     </linearGradient>
-    <linearGradient id="rightBlade" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0040c8;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#1a60e8;stop-opacity:1" />
+    <!-- Right stroke gradient: mid-blue top → lighter blue bottom -->
+    <linearGradient id="rg" x1="78" y1="28" x2="92" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#2233dd"/>
+      <stop offset="100%" stop-color="#7788ff"/>
     </linearGradient>
   </defs>
-  <!-- Left blade: tall diagonal parallelogram (light-to-dark blue, top-right to bottom-left) -->
-  <polygon points="22,92 40,8 58,8 38,92" fill="url(#leftBlade)" />
-  <!-- Right blade: solid deep blue triangle, bottom-right -->
-  <polygon points="50,58 78,92 64,92" fill="url(#rightBlade)" />
+  <!--
+    Left stroke: thick diagonal band, bottom-left to upper-right, rounded ends.
+    Traced as a parallelogram with large border-radius via path arcs.
+  -->
+  <path d="
+    M 6 84
+    Q 2 84 4 80
+    L 56 6
+    Q 58 2 62 4
+    L 74 6
+    Q 78 8 76 12
+    L 24 86
+    Q 22 88 18 88
+    Z
+  " fill="url(#lg)" />
+  <!--
+    Right stroke: thinner band top-right down to bottom-right, with rounded inner notch at top.
+  -->
+  <path d="
+    M 62 32
+    Q 66 26 70 30
+    L 98 82
+    Q 100 86 96 88
+    L 84 88
+    Q 80 88 78 84
+    L 56 46
+    Z
+  " fill="url(#rg)" />
 </svg>
