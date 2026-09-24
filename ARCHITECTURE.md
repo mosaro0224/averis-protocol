@@ -23,6 +23,8 @@ job escrow → ReceivableRouter → AverisFinancingV2 → vault repaid + agent r
 | `AverisAdapterRegistry` | Owner-managed registry of external job protocol adapters (NATIVE / VERIFIED / ATTESTED tiers). |
 | `ReceivableRouter` | Immutable payout receiver. Accepts settlement only from registered protocols, routes repayment. |
 | `AverisACP` | Native ERC-8183-compatible job escrow. Immutable-at-funding payout receiver, settlement and refund paths. |
+| `AverisACPAdapter` | IJobAdapter for AverisACP — LIEN mode, automatic repayment via ReceivableRouter. Registered as adapterId=0. |
+| `ExternalJobAdapter` | IJobAdapter for jobs on owner-whitelisted external platforms. Reads job state via IExternalJob interface, prefers LIEN mode, falls back to OBLIGATION. Registered as adapterId=1. |
 
 ## Adapter tiers
 
@@ -93,12 +95,36 @@ NONE → ACTIVE → REPAID
 | AverisCredit | `0x9330790C74E71f16ef568c4CD6ca06662A611dd9` |
 | AverisReserve | `0x9069f069467578c1F4B6f2385c6B52Ca86f8DDf5` |
 | AverisACPAdapter | `0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A` |
+| ExternalJobAdapter | `0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb` |
 
 Owner: `0x4bAf1e5E3355f37539f423Ba251Dd7f98fE2Ea56`
+
+## terms_hash verification guide
+
+The owner can adjust `advanceRateBps`, `feeBps`, and `protocolMaximum` at any time.
+To protect against rate changes between quote and draw, `/v2/credit/quote` returns:
+
+```json
+{
+  "terms_hash": "0xabc...",
+  "quoted_at_block": 1234567,
+  "expires_at_block": 1235167
+}
+```
+
+`terms_hash = keccak256(abi.encode(advanceRateBps, feeBps, protocolMaximum))` at quote time.
+
+**Before calling `draw()`**, an agent should:
+1. Read `advanceRateBps`, `feeBps`, `protocolMaximum` from `AverisFinancingV2`
+2. Compute `keccak256(abi.encode(...))` locally
+3. Compare with `terms_hash` from the quote
+4. Abort and re-quote if they differ
+5. Confirm current block < `expires_at_block` (~5 minute window)
 
 ## Limitations (testnet)
 
 - Unaudited. Not production software.
 - No timelock on owner functions — add before public mainnet launch.
-- No on-chain reputation or blacklist in V2 — owner may set per-agent credit limit to zero manually.
+- No on-chain reputation or blacklist — owner may set per-agent credit limit to zero manually.
 - No event indexer — position history requires a subgraph or log scanner.
+- ExternalJobAdapter platforms must be whitelisted by owner via `setPlatform(address, true)`.

@@ -1152,6 +1152,77 @@ app.use((req, res) => {
   });
 });
 
+// ── Lightweight event indexer ──────────────────────────────────────────────
+// Scans AverisFinancingV2 events in 2000-block chunks and caches in memory.
+// Refreshes every 5 minutes. Exposes GET /v1/activity.
+
+const EVENT_ABI = parseAbi([
+  "event Drawn(address indexed agent, uint256 indexed jobId, uint256 amount, address pool)",
+  "event Repaid(address indexed agent, uint256 indexed jobId, uint256 principal, uint256 fee)",
+  "event Defaulted(address indexed agent, uint256 indexed jobId, uint256 loss)",
+]);
+
+let eventCache = { events: [], lastBlock: 0n, updatedAt: null };
+
+async function refreshEventIndex() {
+  try {
+    const latest = await publicClient.getBlockNumber();
+    const fromBlock = eventCache.lastBlock > 0n
+      ? eventCache.lastBlock + 1n
+      : (latest > 10000n ? latest - 10000n : 0n); // scan last 10k blocks on first run
+    if (fromBlock > latest) return;
+
+    const chunkSize = 2000n;
+    const newEvents = [];
+    for (let from = fromBlock; from <= latest; from += chunkSize) {
+      const to = from + chunkSize - 1n < latest ? from + chunkSize - 1n : latest;
+      const logs = await publicClient.getLogs({
+        address: CONTRACTS.financing,
+        events: EVENT_ABI,
+        fromBlock: from,
+        toBlock: to,
+      });
+      for (const log of logs) {
+        newEvents.push({
+          event:   log.eventName,
+          agent:   log.args.agent,
+          jobId:   log.args.jobId?.toString(),
+          amount:  (log.args.amount ?? log.args.principal ?? log.args.loss ?? 0n).toString(),
+          fee:     log.args.fee?.toString() ?? "0",
+          pool:    log.args.pool ?? null,
+          block:   log.blockNumber?.toString(),
+          tx:      log.transactionHash,
+        });
+      }
+    }
+    eventCache.events = [...eventCache.events, ...newEvents].slice(-500); // keep last 500
+    eventCache.lastBlock = latest;
+    eventCache.updatedAt = new Date().toISOString();
+    if (newEvents.length > 0) console.log(`Indexed ${newEvents.length} new events (total ${eventCache.events.length})`);
+  } catch (err) {
+    console.error("Event indexer error:", err.message);
+  }
+}
+
+// Run on startup and every 5 minutes
+refreshEventIndex();
+setInterval(refreshEventIndex, 5 * 60 * 1000);
+
+// GET /v1/activity — recent protocol events
+app.get("/v1/activity", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  const limit = Math.min(parseInt(req.query.limit ?? "50"), 200);
+  const agent = req.query.agent?.toLowerCase();
+  let events = [...eventCache.events].reverse(); // newest first
+  if (agent) events = events.filter(e => e.agent?.toLowerCase() === agent);
+  res.json({
+    events: events.slice(0, limit),
+    total: eventCache.events.length,
+    last_indexed_block: eventCache.lastBlock?.toString(),
+    updated_at: eventCache.updatedAt,
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Averis V2 API running on port ${PORT}`);
   console.log(`Chain: ${ARC_CHAIN_ID} @ ${ARC_RPC_URL}`);
