@@ -25,7 +25,8 @@
     "agentic_finance",
     "job_backed_credit",
     "controlled_spending_pool",
-    "receivable_financing"
+    "receivable_financing",
+    "external_job_financing"
   ],
 
   "keywords": [
@@ -82,7 +83,7 @@
   },
 
   "eligibility_requirements": [
-    "Job must exist in a registered adapter protocol (AverisACP or ERC-8183 compatible)",
+    "Job must exist in a registered adapter protocol (AverisACP, ExternalJobAdapter, or any ERC-8183 compatible platform whitelisted by the protocol owner)",
     "Job must be funded and active (status: FUNDED)",
     "Caller must be the job provider/agent address",
     "Job payout receiver must be set to AverisReceivableRouter before funding (LIEN mode) or agent must sign EIP-712 RepaymentObligation (OBLIGATION mode)",
@@ -152,7 +153,8 @@
     "AverisAdapterRegistry": "0x0D6DBfaeAf74b45642064E6bA27F02c69872f4B0",
     "AverisCredit":          "0x9330790C74E71f16ef568c4CD6ca06662A611dd9",
     "AverisReserve":         "0x9069f069467578c1F4B6f2385c6B52Ca86f8DDf5",
-    "AverisACPAdapter":      "0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A"
+    "AverisACPAdapter":        "0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A",
+    "ExternalJobAdapter":      "0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb"
   },
 
   "agent_journey": [

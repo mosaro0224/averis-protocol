@@ -45,14 +45,15 @@ const publicClient = createPublicClient({
 // ── Contract addresses (read from env, set after deployment) ───────────────
 
 const CONTRACTS = {
-  vault:      process.env.AVERIS_VAULT      || null,
-  financing:  process.env.AVERIS_FINANCING  || null,
-  acp:        process.env.AVERIS_ACP        || null,
-  router:     process.env.AVERIS_ROUTER     || null,
-  hood:       process.env.AVERIS_HOOD       || null,
-  factory:    process.env.AVERIS_FACTORY    || null,
-  registry:   process.env.AVERIS_REGISTRY   || null,
-  credit:     process.env.AVERIS_CREDIT     || null,
+  vault:           process.env.AVERIS_VAULT           || null,
+  financing:       process.env.AVERIS_FINANCING       || null,
+  acp:             process.env.AVERIS_ACP             || null,
+  router:          process.env.AVERIS_ROUTER          || null,
+  hood:            process.env.AVERIS_HOOD            || null,
+  factory:         process.env.AVERIS_FACTORY         || null,
+  registry:        process.env.AVERIS_REGISTRY        || null,
+  credit:          process.env.AVERIS_CREDIT          || null,
+  externalAdapter: process.env.AVERIS_EXTERNAL_ADAPTER || "0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb",
 };
 
 const contractsDeployed = () => Object.values(CONTRACTS).every(Boolean);
@@ -773,9 +774,9 @@ function buildDiscoveryDoc(liveParams) {
     protocol:       "Averis",
     version:        "2.0.0",
     status:         "testnet",
-    network_note:   "Currently live on Arc Testnet (chain 1227). USDC on this network has no real-world value. Mainnet deployment is on the roadmap.",
+    network_note:   "Currently live on Arc Testnet (chain 5042002). USDC on this network has no real-world value. Mainnet deployment is on the roadmap.",
     description:    AGENT_CARD.description,
-    capabilities:   AGENT_CARD.capabilities,
+    capabilities:   [...(AGENT_CARD.capabilities || []), "external_job_financing"],
     keywords:       AGENT_CARD.keywords,
     chain:          AGENT_CARD.chain,
     contracts:      CONTRACTS,
@@ -866,7 +867,7 @@ app.get("/v1/summary", async (_req, res) => {
   res.send(`
 AVERIS PROTOCOL — Working Capital for Autonomous AI Agents
 ==========================================================
-Status:   TESTNET (Arc Testnet, chain 1227)
+Status:   TESTNET (Arc Testnet, chain 5042002)
 Version:  2.0.0
 Website:  https://averisprotocol.xyz
 API:      https://api.averisprotocol.xyz

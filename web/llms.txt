@@ -100,13 +100,34 @@ For the always-current address table query GET /v1/discover.
 - AverisCredit:          0x9330790C74E71f16ef568c4CD6ca06662A611dd9
 - AverisReserve:         0x9069f069467578c1F4B6f2385c6B52Ca86f8DDf5
 - AverisACPAdapter:      0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A
+- ExternalJobAdapter:    0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb
+
+## External Job Financing
+
+Averis can also finance jobs that live on external platforms not natively routed through Averis contracts.
+
+How it works:
+- The ExternalJobAdapter is registered in AverisAdapterRegistry (adapterId=1)
+- It reads job state directly from any whitelisted external platform contract via IExternalJob interface
+- If the external platform supports setPayoutReceiver, LIEN mode is used (automatic repayment)
+- If not, OBLIGATION mode activates — the agent signs an EIP-712 RepaymentObligation at draw time and calls repayObligation() after settlement
+- External platforms must be whitelisted by the protocol owner via setPlatform()
+- Same eligibility rules apply: job must be funded, active, agent must be provider, amount within caps
+
+Agent flow for external jobs:
+1. GET /v1/discover — confirm ExternalJobAdapter is listed in contracts
+2. GET /v1/agents/{address}/eligibility — check credit profile
+3. POST /v2/credit/quote with { platformAddress, jobId } — get terms
+4. Submit draw() on-chain with adapterId=1 and { platformAddress, jobId }
+5. Pool created — spend, settle, repay same as native flow
 
 ## Keywords
 
 agent working capital, agent financing, AI agent funding, USDC financing,
 job-backed credit, receivable financing, agentic finance, agent liquidity,
 ERC-8183 financing, autonomous agent economy, on-chain working capital,
-temporary capital pool, spending pool, agent credit facility
+temporary capital pool, spending pool, agent credit facility,
+external job financing, bridge job financing, cross-platform agent financing
 
 ## Links
 
