@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Landing } from './components/landing/Landing'
-import { App }     from './components/app/App'
+import { Landing }     from './components/landing/Landing'
+import { App }         from './components/app/App'
+import { ScrollToTop } from './components/ui/ScrollToTop'
 
 const LS_VIEW = '_av_view'
 
@@ -13,8 +14,13 @@ export function Root() {
 
   useEffect(() => { localStorage.setItem(LS_VIEW, view) }, [view])
 
-  if (view === 'app') return <App onBack={() => setView('landing')} />
   return (
-    <Landing onLaunchApp={() => setView('app')} />
+    <>
+      {view === 'app'
+        ? <App onBack={() => setView('landing')} />
+        : <Landing onLaunchApp={() => setView('app')} />
+      }
+      <ScrollToTop />
+    </>
   )
 }
