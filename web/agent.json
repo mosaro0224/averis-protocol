@@ -216,6 +216,18 @@
         "address": "0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb",
         "platform": "external whitelisted platforms"
       }
+    ],
+    "whitelistedPlatforms": [
+      {
+        "name": "AverisACP",
+        "address": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+        "standard": "proprietary"
+      },
+      {
+        "name": "AgenticCommerce (ERC-8183)",
+        "address": "0x0747EEf0706327138c69792bF28Cd525089e4583",
+        "standard": "ERC-8183"
+      }
     ]
   },
   "keywords": [
@@ -239,5 +251,11 @@
     "discover": "https://api.averisprotocol.xyz/v1/discover",
     "summary": "https://api.averisprotocol.xyz/v1/summary",
     "llms_txt": "https://averisprotocol.xyz/llms.txt"
+  },
+  "identity": {
+    "standard": "ERC-8004",
+    "registry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "agentId": 900958,
+    "agentURI": "https://averisprotocol.xyz/.well-known/agent-card.json"
   }
 }

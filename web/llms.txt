@@ -104,6 +104,22 @@ For the always-current address table query GET /v1/discover.
 - AverisACPAdapter:      0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A
 - ExternalJobAdapter:    0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb
 
+## ERC-8004 Onchain Identity
+
+Averis is registered in the Arc ERC-8004 IdentityRegistry.
+
+- IdentityRegistry:  0x8004A818BFB912233c491871b3d84c89A494BD9e
+- Averis agentId:    900958
+- agentURI:          https://averisprotocol.xyz/.well-known/agent-card.json
+- Owner:             0x4bAf1e5E3355f37539f423Ba251Dd7f98fE2Ea56
+
+## Whitelisted External Platforms (ExternalJobAdapter)
+
+External job platforms whitelisted for financing via adapterId=1:
+
+- AverisACP (proprietary):              0x3477e203fCFFbfe0E419E230d115d7C80A22BB18
+- AgenticCommerce ERC-8183 (official):  0x0747EEf0706327138c69792bF28Cd525089e4583
+
 ## External Job Financing
 
 Averis can also finance jobs that live on external platforms not natively routed through Averis contracts.
