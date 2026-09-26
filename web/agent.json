@@ -2,7 +2,7 @@
   "schema": "https://a2a-protocol.org/schema/agent.json",
   "version": "1.0",
   "name": "Averis Protocol",
-  "description": "Working capital infrastructure for autonomous AI agents. Averis finances verified jobs so agents can complete work they have already been hired to do.",
+  "description": "Working capital infrastructure for autonomous AI agents. Averis finances verified jobs so agents can complete work they have already been hired to do. Supports both native AverisACP jobs and external platform jobs via ExternalJobAdapter (adapterId=1).",
   "url": "https://averisprotocol.xyz",
   "provider": {
     "name": "Averis Protocol",
@@ -13,16 +13,38 @@
     {
       "id": "agent_working_capital",
       "name": "Agent Working Capital",
-      "description": "Provides temporary USDC financing to AI agents with active funded jobs",
+      "description": "Provides temporary USDC financing to AI agents with active funded jobs. Works with native AverisACP jobs (adapterId=0) and external platform jobs whitelisted in ExternalJobAdapter (adapterId=1). Uses LIEN mode if the platform supports setPayoutReceiver, otherwise OBLIGATION mode.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "agentAddress": { "type": "string", "description": "Agent wallet address" },
-          "jobId": { "type": "string", "description": "Job ID on the escrow protocol" },
-          "protocol": { "type": "string", "description": "Job protocol contract address" },
-          "requestedAmount": { "type": "string", "description": "Requested USDC amount (6 decimals)" }
+          "agentAddress": {
+            "type": "string",
+            "description": "Agent wallet address"
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Job ID on the escrow protocol"
+          },
+          "protocol": {
+            "type": "string",
+            "description": "Job protocol contract address"
+          },
+          "requestedAmount": {
+            "type": "string",
+            "description": "Requested USDC amount (6 decimals)"
+          },
+          "adapterId": {
+            "type": "integer",
+            "description": "0 for AverisACP (native), 1 for ExternalJobAdapter (external platforms)",
+            "default": 0
+          }
         },
-        "required": ["agentAddress", "jobId", "protocol", "requestedAmount"]
+        "required": [
+          "agentAddress",
+          "jobId",
+          "protocol",
+          "requestedAmount"
+        ]
       }
     },
     {
@@ -32,12 +54,25 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "agentAddress": { "type": "string" },
-          "protocol": { "type": "string" },
-          "jobId": { "type": "string" },
-          "requestedAmount": { "type": "string" }
+          "agentAddress": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "requestedAmount": {
+            "type": "string"
+          }
         },
-        "required": ["agentAddress", "protocol", "jobId", "requestedAmount"]
+        "required": [
+          "agentAddress",
+          "protocol",
+          "jobId",
+          "requestedAmount"
+        ]
       }
     },
     {
@@ -47,9 +82,13 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "agentAddress": { "type": "string" }
+          "agentAddress": {
+            "type": "string"
+          }
         },
-        "required": ["agentAddress"]
+        "required": [
+          "agentAddress"
+        ]
       }
     },
     {
@@ -59,9 +98,13 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "jobId": { "type": "string" }
+          "jobId": {
+            "type": "string"
+          }
         },
-        "required": ["jobId"]
+        "required": [
+          "jobId"
+        ]
       }
     },
     {
@@ -71,9 +114,51 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "jobId": { "type": "string" }
+          "jobId": {
+            "type": "string"
+          }
         },
-        "required": ["jobId"]
+        "required": [
+          "jobId"
+        ]
+      }
+    },
+    {
+      "id": "external_job_financing",
+      "name": "External Job Financing",
+      "description": "Finance jobs that live on external platforms not natively routed through AverisACP. The ExternalJobAdapter (adapterId=1) reads job state from any whitelisted platform via IExternalJob interface. Supports LIEN mode (auto-repayment via setPayoutReceiver) and OBLIGATION mode (manual repayment).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platformAddress": {
+            "type": "string",
+            "description": "Address of the external job platform contract (must be whitelisted)"
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Job ID on the external platform"
+          },
+          "agentAddress": {
+            "type": "string",
+            "description": "Agent wallet address requesting financing"
+          },
+          "requestedAmount": {
+            "type": "string",
+            "description": "Requested USDC amount (6 decimals)"
+          }
+        },
+        "required": [
+          "platformAddress",
+          "jobId",
+          "agentAddress",
+          "requestedAmount"
+        ]
+      },
+      "adapter": {
+        "id": 1,
+        "name": "ExternalJobAdapter",
+        "address": "0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb",
+        "registry": "0x0D6DBfaeAf74b45642064E6bA27F02c69872f4B0"
       }
     }
   ],
@@ -105,7 +190,33 @@
     "chainId": 5042002,
     "asset": "USDC",
     "status": "testnet",
-    "note": "No real-world value. Mainnet deployment pending audit."
+    "note": "No real-world value. Mainnet deployment pending audit.",
+    "contracts": {
+      "AverisVault": "0xf7F47493E2f042a428a531724bE62854002979cA",
+      "AverisFinancingV2": "0x102eC41EDdeed916012D7B345c42e7Be64AD2051",
+      "AverisACP": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+      "AverisAdapterRegistry": "0x0D6DBfaeAf74b45642064E6bA27F02c69872f4B0",
+      "AverisACPAdapter": "0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A",
+      "ExternalJobAdapter": "0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb",
+      "ReceivableRouter": "0x0b2C571D2FD5199b758d426340CF8260515eFF15",
+      "AverisHood": "0xd7D8633804FfdB3504Ba6F8036b26536f3d89E0a",
+      "AverisCredit": "0x9330790C74E71f16ef568c4CD6ca06662A611dd9",
+      "AverisReserve": "0x9069f069467578c1F4B6f2385c6B52Ca86f8DDf5"
+    },
+    "adapters": [
+      {
+        "id": 0,
+        "name": "AverisACPAdapter",
+        "address": "0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A",
+        "platform": "AverisACP (native)"
+      },
+      {
+        "id": 1,
+        "name": "ExternalJobAdapter",
+        "address": "0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb",
+        "platform": "external whitelisted platforms"
+      }
+    ]
   },
   "keywords": [
     "agent working capital",
@@ -119,7 +230,9 @@
     "ERC-8183 financing",
     "autonomous agent economy",
     "spending pool",
-    "agent credit facility"
+    "agent credit facility",
+    "external_job_financing",
+    "cross-platform"
   ],
   "discovery": {
     "agent_card": "https://api.averisprotocol.xyz/.well-known/agent-card.json",
