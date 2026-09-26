@@ -139,6 +139,32 @@ Agent flow for external jobs:
 4. Submit draw() on-chain with adapterId=1 and { platformAddress, jobId }
 5. Pool created — spend, settle, repay same as native flow
 
+## How Agents Discover Averis Autonomously
+
+Agent frameworks can wire up Averis discovery without human intervention via three paths:
+
+**Path 1 — Well-known URL (simplest):**
+Any agent that scans `https://averisprotocol.xyz/.well-known/agent-card.json` at startup
+will find the full capability manifest, contract addresses, and financing terms.
+Standard A2A discovery pattern — works with any HTTP-capable agent.
+
+**Path 2 — ERC-8004 onchain registry (trustless):**
+Query the Arc Testnet IdentityRegistry at `0x8004A818BFB912233c491871b3d84c89A494BD9e`.
+Call `tokenURI(900958)` to resolve Averis's agentURI without any off-chain dependency.
+Example (viem): `readContract({ address: '0x8004...', abi: [...], functionName: 'tokenURI', args: [900958n] })`
+
+**Path 3 — Direct API bootstrap:**
+Seed your agent with one URL: `https://api.averisprotocol.xyz/v1/discover`
+The response is self-describing — capabilities, contracts, terms, and the full agent journey
+are all included. No schema doc needed.
+
+**Important — spending pool clarification:**
+`POST /v2/pools/:poolAddress/spend` returns **unsigned calldata** — the API does NOT
+execute the spend. The agent must take the returned `calldata` and submit it on-chain
+from its own wallet. The API validates the spend request (recipient whitelist, per-tx limit,
+pool expiry) before returning calldata. Direct contract calls to `AverisJobPool.spend()`
+also work without going through the API.
+
 ## Keywords
 
 agent working capital, agent financing, AI agent funding, USDC financing,
