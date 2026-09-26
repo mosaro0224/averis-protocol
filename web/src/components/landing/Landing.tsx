@@ -18,14 +18,12 @@ const PROTOCOL_FEATURES = [
 
 interface Props {
   onLaunchApp: () => void
-  onAgents?: () => void
-  onDocs?: () => void
 }
 
-export function Landing({ onLaunchApp, onAgents, onDocs }: Props) {
+export function Landing({ onLaunchApp }: Props) {
   return (
     <div className="min-h-dvh bg-averis-bg text-averis-text flex flex-col">
-      <Nav onLaunchApp={onLaunchApp} onAgents={onAgents} onDocs={onDocs} />
+      <Nav onLaunchApp={onLaunchApp} />
 
       <main className="flex-1">
         {/* Hero */}

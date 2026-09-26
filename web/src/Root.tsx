@@ -15,10 +15,6 @@ export function Root() {
 
   if (view === 'app') return <App onBack={() => setView('landing')} />
   return (
-    <Landing
-      onLaunchApp={() => setView('app')}
-      onAgents={() => { setView('app') }}
-      onDocs={() => window.open('https://averisprotocol.xyz/llms.txt', '_blank')}
-    />
+    <Landing onLaunchApp={() => setView('app')} />
   )
 }

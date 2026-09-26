@@ -2,11 +2,9 @@ import { AverisLogo } from './AverisLogo'
 
 interface Props {
   onLaunchApp: () => void
-  onAgents?: () => void
-  onDocs?: () => void
 }
 
-export function Nav({ onLaunchApp, onAgents, onDocs }: Props) {
+export function Nav({ onLaunchApp }: Props) {
   return (
     <nav className="border-b border-averis-line sticky top-0 bg-[#09100c] z-40">
       <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4">
@@ -26,18 +24,6 @@ export function Nav({ onLaunchApp, onAgents, onDocs }: Props) {
             className="font-mono text-[10px] tracking-[0.06em] text-averis-muted2 hover:text-averis-text px-3 py-2 bg-transparent border-0 cursor-pointer transition-colors">
             PROTOCOL
           </button>
-          {onAgents && (
-            <button onClick={onAgents}
-              className="font-mono text-[10px] tracking-[0.06em] text-averis-muted2 hover:text-averis-text px-3 py-2 bg-transparent border-0 cursor-pointer transition-colors">
-              AGENTS
-            </button>
-          )}
-          {onDocs && (
-            <button onClick={onDocs}
-              className="font-mono text-[10px] tracking-[0.06em] text-averis-muted2 hover:text-averis-text px-3 py-2 bg-transparent border-0 cursor-pointer transition-colors">
-              DOCS
-            </button>
-          )}
         </div>
 
         <div className="ml-auto flex items-center gap-3">
