@@ -3,7 +3,7 @@ import { AverisLogo } from './AverisLogo'
 export function Footer() {
   return (
     <footer className="border-t border-averis-line mt-0 bg-[#09100c]">
-      <div className="max-w-[1180px] mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+      <div className="max-w-[1400px] mx-auto px-8 py-4 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <AverisLogo size={18} showText={false} />
           <span className="font-mono text-[9px] text-averis-muted tracking-[0.1em]">AVERIS</span>

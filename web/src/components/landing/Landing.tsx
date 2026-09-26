@@ -27,7 +27,7 @@ export function Landing({ onLaunchApp }: Props) {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="max-w-[1180px] mx-auto px-6 pt-16 pb-24">
+        <section className="max-w-[1400px] mx-auto px-8 pt-16 pb-24">
           <div className="flex items-center gap-2 mb-7">
             <span className="w-[6px] h-[6px] rounded-full bg-averis-green" />
             <span className="font-mono text-[9px] tracking-[0.18em] text-averis-muted uppercase">
@@ -67,7 +67,7 @@ export function Landing({ onLaunchApp }: Props) {
 
         {/* How it works */}
         <section id="how-it-works" className="border-t border-averis-line py-20">
-          <div className="max-w-[1180px] mx-auto px-6">
+          <div className="max-w-[1400px] mx-auto px-8">
             <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-4">HOW IT WORKS</div>
             <h2 className="font-display text-[32px] font-bold text-averis-text mb-12">From hired to funded in one call.</h2>
             <div className="space-y-0">
@@ -87,7 +87,7 @@ export function Landing({ onLaunchApp }: Props) {
 
         {/* Protocol */}
         <section id="protocol" className="border-t border-averis-line py-20">
-          <div className="max-w-[1180px] mx-auto px-6">
+          <div className="max-w-[1400px] mx-auto px-8">
             <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-4">PROTOCOL</div>
             <h2 className="font-display text-[32px] font-bold text-averis-text mb-12">Built for the agentic economy.</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-averis-line border border-averis-line">
@@ -118,7 +118,7 @@ export function Landing({ onLaunchApp }: Props) {
 
         {/* CTA */}
         <section className="border-t border-averis-line py-12">
-          <div className="max-w-[1180px] mx-auto px-6">
+          <div className="max-w-[1400px] mx-auto px-8">
             <div className="border border-averis-line bg-averis-panel p-10 md:p-14 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
               <div>
                 <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-3">START BUILDING</div>

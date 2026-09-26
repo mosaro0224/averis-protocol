@@ -25,7 +25,7 @@ export function App({ onBack }: Props) {
     <div className="min-h-dvh bg-averis-bg text-averis-text flex flex-col">
       {/* Inner nav bar */}
       <div className="border-b border-averis-line sticky top-0 bg-[#09100c] z-40">
-        <div className="max-w-[1180px] mx-auto px-6 h-12 flex items-center gap-4">
+        <div className="w-full px-8 h-12 flex items-center gap-4">
           <button onClick={onBack} className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer text-averis-muted hover:text-averis-text transition-colors p-0">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
               <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>

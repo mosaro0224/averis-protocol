@@ -7,7 +7,7 @@ interface Props {
 export function Nav({ onLaunchApp }: Props) {
   return (
     <nav className="border-b border-averis-line sticky top-0 bg-[#09100c] z-40">
-      <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4">
+      <div className="max-w-[1400px] mx-auto px-8 h-14 flex items-center gap-4">
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           className="flex items-center gap-0 border-0 bg-transparent cursor-pointer flex-shrink-0 whitespace-nowrap p-0"

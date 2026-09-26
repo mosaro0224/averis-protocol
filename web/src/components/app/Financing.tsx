@@ -39,7 +39,7 @@ export function Financing() {
   const fee = feeBps !== undefined ? Number(feeBps) / 100 : 2
 
   return (
-    <div className="max-w-[1180px] mx-auto px-6 py-8 space-y-8">
+    <div className="w-full px-8 py-8 space-y-8">
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-3">

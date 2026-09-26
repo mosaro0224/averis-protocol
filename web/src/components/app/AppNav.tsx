@@ -14,7 +14,7 @@ const TABS: { id: AppTab; label: string; soon?: boolean }[] = [
 
 export function AppNav({ active, onChange }: Props) {
   return (
-    <div className="flex border-b border-averis-line overflow-x-auto">
+    <div className="flex border-b border-averis-line overflow-x-auto px-2">
       {TABS.map(tab => (
         <button
           key={tab.id}

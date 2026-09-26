@@ -20,7 +20,7 @@ export function Agents() {
   const fmt = (v: bigint | undefined) => v !== undefined ? `$${parseFloat(formatUnits(v, USDC_DECIMALS)).toFixed(2)}` : '—'
 
   return (
-    <div className="max-w-[1180px] mx-auto px-6 py-8 space-y-8">
+    <div className="w-full px-8 py-8 space-y-8">
       <div>
         <div className="font-mono text-[9px] tracking-[0.14em] text-averis-muted mb-3">AGENT IDENTITY</div>
         <h2 className="font-display text-[28px] font-bold text-averis-text mb-2">Agents</h2>

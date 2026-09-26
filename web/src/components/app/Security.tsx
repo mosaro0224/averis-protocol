@@ -13,7 +13,7 @@ const CHECKS = [
 
 export function Security() {
   return (
-    <div className="max-w-[1180px] mx-auto px-6 py-8 space-y-8">
+    <div className="w-full px-8 py-8 space-y-8">
       <div>
         <div className="font-mono text-[9px] tracking-[0.14em] text-averis-muted mb-3">PROTOCOL SECURITY</div>
         <h2 className="font-display text-[28px] font-bold text-averis-text mb-2">Security</h2>
