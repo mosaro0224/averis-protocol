@@ -963,7 +963,7 @@ AUTHENTICATION
 --------------
 Read-only endpoints: no auth required.
 Mutating actions:    EIP-712 signature in X-Agent-Signature header.
-Domain: {name: "AverisProtocol", version: "2", chainId: 1227}
+Domain: {name: "AverisProtocol", version: "2", chainId: 5042002}
 Type:   AgentRequest{agentAddress, nonce, expiry, chainId}
 
 IMPORTANT NOTES
