@@ -323,8 +323,8 @@
         "chain_id": 46630,
         "name": "Robinhood Chain Testnet",
         "contracts": {
-          "AgentPolicyRegistry":  "pending — deployment in progress",
-          "AgentReceiptRegistry": "pending — deployment in progress"
+          "AgentPolicyRegistry":  "0xf7F47493E2f042a428a531724bE62854002979cA",
+          "AgentReceiptRegistry": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"
         }
       },
       "arc_testnet": {

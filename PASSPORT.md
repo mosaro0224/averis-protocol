@@ -19,22 +19,22 @@ Deployed on **Robinhood Chain Testnet** (chain ID 46630).
 
 | Contract | Address | Notes |
 |---|---|---|
-| AgentPolicyRegistry | TBD after faucet funding | EIP-712 policy commitments |
-| AgentReceiptRegistry | TBD after faucet funding | Append-only activity receipts |
+| AgentPolicyRegistry | `0xf7F47493E2f042a428a531724bE62854002979cA` | EIP-712 policy commitments |
+| AgentReceiptRegistry | `0x3477e203fCFFbfe0E419E230d115d7C80A22BB18` | Append-only activity receipts |
 
 ERC-8004 IdentityRegistry (same address on all testnets): `0x8004A818BFB912233c491871b3d84c89A494BD9e`
 
-Once deployed, set Railway env vars:
+Set Railway env vars:
 ```
-PASSPORT_POLICY_REGISTRY=0x...
-PASSPORT_RECEIPT_REGISTRY=0x...
+PASSPORT_POLICY_REGISTRY=0xf7F47493E2f042a428a531724bE62854002979cA
+PASSPORT_RECEIPT_REGISTRY=0x3477e203fCFFbfe0E419E230d115d7C80A22BB18
 PASSPORT_CHAIN_ID=46630
 ```
 
-And set Cloudflare Pages env vars for the frontend:
+Set Cloudflare Pages env vars for the frontend:
 ```
-VITE_PASSPORT_POLICY_REGISTRY=0x...
-VITE_PASSPORT_RECEIPT_REGISTRY=0x...
+VITE_PASSPORT_POLICY_REGISTRY=0xf7F47493E2f042a428a531724bE62854002979cA
+VITE_PASSPORT_RECEIPT_REGISTRY=0x3477e203fCFFbfe0E419E230d115d7C80A22BB18
 ```
 
 ---
@@ -242,10 +242,10 @@ web/src/
 
 ## Deployment Checklist
 
-1. Get ETH on RH Testnet from `https://faucet.testnet.chain.robinhood.com` for `0x4bAf1e5E3355f37539f423Ba251Dd7f98fE2Ea56`
-2. Run: `forge script script/DeployPassport.s.sol --rpc-url https://rpc.testnet.chain.robinhood.com --private-key $DEPLOYER_PRIVATE_KEY --broadcast --chain-id 46630`
-3. Note the two contract addresses from script output
-4. Add to Railway: `PASSPORT_POLICY_REGISTRY`, `PASSPORT_RECEIPT_REGISTRY`, `PASSPORT_CHAIN_ID=46630`
-5. Add to Cloudflare Pages: `VITE_PASSPORT_POLICY_REGISTRY`, `VITE_PASSPORT_RECEIPT_REGISTRY`
-6. Update `AGENTS.md` and `DEPLOYMENT.md` with addresses
-7. Update `api/agent-card.json` passport.chains.rh_testnet.contracts with real addresses
+- [x] Get ETH on RH Testnet — sent by owner to `0x4bAf1e5E3355f37539f423Ba251Dd7f98fE2Ea56`
+- [x] Deploy to RH Testnet — commit `b29173c`, broadcast recorded in `broadcast/DeployPassport.s.sol/46630/run-latest.json`
+- [x] `api/agent-card.json` updated with confirmed addresses
+- [x] `PASSPORT.md` updated with confirmed addresses
+- [ ] Add to Railway: `PASSPORT_POLICY_REGISTRY=0xf7F47493E2f042a428a531724bE62854002979cA`, `PASSPORT_RECEIPT_REGISTRY=0x3477e203fCFFbfe0E419E230d115d7C80A22BB18`, `PASSPORT_CHAIN_ID=46630`
+- [ ] Add to Cloudflare Pages: `VITE_PASSPORT_POLICY_REGISTRY=0xf7F47493E2f042a428a531724bE62854002979cA`, `VITE_PASSPORT_RECEIPT_REGISTRY=0x3477e203fCFFbfe0E419E230d115d7C80A22BB18`
+- [ ] (Optional) Deploy to Arc Testnet with `script/DeployPassportArc.s.sol` if cross-chain passport needed
