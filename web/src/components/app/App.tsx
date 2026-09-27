@@ -13,9 +13,9 @@ import { EXPLORER }  from '../../lib/constants'
 
 const LS_TAB = '_av_tab'
 
-interface Props { onBack: () => void }
+interface Props { onBack: () => void; onPassport?: () => void }
 
-export function App({ onBack }: Props) {
+export function App({ onBack, onPassport }: Props) {
   const { address } = useAccount()
   const [tab, setTab] = useState<AppTab>(() => (localStorage.getItem(LS_TAB) as AppTab) ?? 'overview')
 
@@ -36,7 +36,7 @@ export function App({ onBack }: Props) {
             <span className="font-mono text-[10px] text-averis-muted">/</span>
             <span className="font-mono text-[11px] tracking-[0.06em] text-averis-text2">APP</span>
           </div>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             {address && (
               <a
                 href={`${EXPLORER}/address/${address}`}
@@ -46,6 +46,14 @@ export function App({ onBack }: Props) {
               >
                 {address.slice(0, 6)}…{address.slice(-4)}
               </a>
+            )}
+            {onPassport && (
+              <button
+                onClick={onPassport}
+                className="font-mono text-[9px] tracking-[0.06em] text-averis-muted2 hover:text-averis-text border border-averis-line/50 px-3 py-1 bg-transparent transition-colors cursor-pointer rounded"
+              >
+                PASSPORT
+              </button>
             )}
             <appkit-button size="sm" />
           </div>

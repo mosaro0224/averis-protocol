@@ -2,9 +2,10 @@ import { AverisLogo } from './AverisLogo'
 
 interface Props {
   onLaunchApp: () => void
+  onLaunchPassport?: () => void
 }
 
-export function Nav({ onLaunchApp }: Props) {
+export function Nav({ onLaunchApp, onLaunchPassport }: Props) {
   return (
     <nav className="border-b border-averis-line sticky top-0 bg-[#09100c] z-40">
       <div className="max-w-[1400px] mx-auto px-8 h-14 flex items-center gap-4">
@@ -26,7 +27,15 @@ export function Nav({ onLaunchApp }: Props) {
           </button>
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2">
+          {onLaunchPassport && (
+            <button
+              onClick={onLaunchPassport}
+              className="font-mono text-[10px] tracking-[0.06em] text-averis-muted2 hover:text-averis-text border border-averis-line/50 px-4 py-2 bg-transparent hover:border-averis-line transition-colors cursor-pointer"
+            >
+              PASSPORT
+            </button>
+          )}
           <button
             onClick={onLaunchApp}
             className="font-mono text-[10px] tracking-[0.06em] text-averis-text2 border border-averis-line px-4 py-2 bg-transparent hover:border-averis-linemid transition-colors cursor-pointer"

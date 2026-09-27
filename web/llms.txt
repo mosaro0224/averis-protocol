@@ -165,13 +165,64 @@ from its own wallet. The API validates the spend request (recipient whitelist, p
 pool expiry) before returning calldata. Direct contract calls to `AverisJobPool.spend()`
 also work without going through the API.
 
+## Agent Economic Passport
+
+Averis includes a non-custodial, cross-chain identity and reputation layer for autonomous agents called the Agent Economic Passport.
+
+### What It Is
+
+The Passport is NOT a financing product. It is an identity and track-record layer:
+- **AgentPolicyRegistry** (Robinhood Chain Testnet, chain 46630): agents commit to capability policies using EIP-712 signatures. Policies are versioned, revocable, and non-transferable. No funds are held. Policy hashes are stored onchain as commitments.
+- **AgentReceiptRegistry** (Robinhood Chain Testnet, chain 46630): append-only registry of verified economic activity. Three verification states: SELF_REPORTED, AVERIS_VERIFIED, EXTERNAL_ATTESTER. Receipts reference completed work by IPFS hash — no raw data onchain.
+- **Identity**: linked to ERC-8004 `IdentityRegistry` at `0x8004A818BFB912233c491871b3d84c89A494BD9e` on each chain.
+
+### Passport API
+
+Base: `https://api.averisprotocol.xyz/v2/agents/:address`
+
+| Endpoint | Auth | Description |
+|---|---|---|
+| GET /v2/agents/:address/passport | No | Full passport |
+| GET /v2/agents/:address/policies | No | Policy commitments |
+| POST /v2/agents/:address/policies | EIP-712 | Commit a new policy |
+| GET /v2/agents/:address/receipts | No | Verified receipts |
+| GET /v2/agents/:address/reputation | No | Computed score |
+| GET /v2/agents/:address/risk | No | Risk metrics |
+| GET /v2/agents/:address/identity | No | ERC-8004 identity |
+| GET /v2/agents/:address/agreements | No | Agreement history |
+| GET /v2/agents/:address/chains | No | Cross-chain profile |
+| GET /v2/agents/:address/counterparties | No | Counterparty relationships |
+| GET /v2/agents/:address/transactions | No | Transaction history |
+| GET /v2/agents/:address/capabilities | No | Declared capabilities |
+| GET /v2/agents/:address/authorization | No | Authorization status |
+
+### Passport MCP Tools
+
+MCP endpoint `https://api.averisprotocol.xyz/v1/mcp` exposes these Passport tools:
+- `passport_get` — full passport
+- `passport_policies_list` — policy commitments
+- `passport_receipts_list` — verified receipts
+- `passport_reputation` — reputation score
+- `passport_risk` — risk metrics
+- `passport_policy_commit` — commit a new policy (EIP-712 required)
+
+### Important Notes
+
+- No USDC or funds are held by Passport contracts — non-custodial.
+- Policy commitments are EIP-712 signed — the server verifies the signature before storing.
+- Reputation and risk scores are computed from on-chain Averis financing history and anchored receipts — no fabricated data.
+- Passport contracts are deployed on Robinhood Chain Testnet (chain 46630); Averis financing contracts remain on Arc Testnet (chain 5042002).
+- Contracts pending final address confirmation after RH Testnet faucet funding.
+
 ## Keywords
 
 agent working capital, agent financing, AI agent funding, USDC financing,
 job-backed credit, receivable financing, agentic finance, agent liquidity,
 ERC-8183 financing, autonomous agent economy, on-chain working capital,
 temporary capital pool, spending pool, agent credit facility,
-external job financing, bridge job financing, cross-platform agent financing
+external job financing, bridge job financing, cross-platform agent financing,
+agent passport, agent identity, agent reputation, agent policy, ERC-8004,
+agent economic passport, cross-chain agent identity, autonomous agent reputation
 
 ## Links
 

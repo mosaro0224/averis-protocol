@@ -16,6 +16,9 @@ import express from "express";
 import { createPublicClient, http, recoverTypedDataAddress, parseAbi, keccak256, encodePacked } from "viem";
 import { createRequire } from "module";
 import { handleMCP, MCP_TOOLS } from "./mcp.mjs";
+import { handleMCPPassport, MCP_PASSPORT_TOOLS } from "./mcp-passport.mjs";
+import * as passportService from "./passport.mjs";
+import * as passportStore   from "./passport-store.mjs";
 
 const _require = createRequire(import.meta.url);
 const AGENT_CARD = _require("./agent-card.json");
@@ -1057,7 +1060,7 @@ app.post("/mcp", async (req, res) => {
       jsonrpc: "2.0",
       id: body.id ?? null,
       result: {
-        tools: MCP_TOOLS.map((t) => ({
+        tools: [...MCP_TOOLS, ...MCP_PASSPORT_TOOLS].map((t) => ({
           name:        t.name,
           title:       t.title,
           description: t.description,
@@ -1069,8 +1072,18 @@ app.post("/mcp", async (req, res) => {
     });
   }
 
-  // tools/call — delegate to existing MCP dispatcher
+  // tools/call — try passport tools first, then delegate to existing MCP dispatcher
   if (body.method === "tools/call") {
+    const toolName = body.params?.name;
+    const isPassportTool = MCP_PASSPORT_TOOLS.some(t => t.name === toolName);
+    if (isPassportTool) {
+      try {
+        const result = await handleMCPPassport(toolName, body.params?.arguments ?? body.params?.input ?? {});
+        return res.json({ jsonrpc: "2.0", id: body.id ?? null, result });
+      } catch (err) {
+        return res.status(500).json({ jsonrpc: "2.0", id: body.id ?? null, error: { code: -32000, message: err.message } });
+      }
+    }
     const ctx = buildMcpCtx();
     // Wrap in a fake req/res that captures the MCP response
     const fakeReq = { body: { method: "tools/call", params: body.params }, headers: req.headers };
@@ -1121,7 +1134,124 @@ app.options("/mcp", (req, res) => {
   res.status(204).end();
 });
 
-// 404 handler
+// ── Agent Passport API Routes (/v2/agents/:address/*) ─────────────────────────
+// These routes extend the existing API without breaking any existing Averis routes.
+// All passport data is either onchain (via chain adapters) or offchain (passport-store).
+
+// GET /v2/agents/:address/passport — full economic passport
+app.get("/v2/agents/:address/passport", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  try {
+    const profile = await passportService.getEconomicProfile(req.params.address);
+    res.json(profile);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /v2/agents/:address/economic-profile — unified Averis Bank + Passport view
+app.get("/v2/agents/:address/economic-profile", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  try {
+    const [profile, averis] = await Promise.all([
+      passportService.getEconomicProfile(req.params.address),
+      passportService.getAverisData(req.params.address),
+    ]);
+    res.json({ ...profile, averisBank: averis });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /v2/agents/:address/identity
+app.get("/v2/agents/:address/identity", async (req, res) => {
+  try { res.json(await passportService.getIdentity(req.params.address)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /v2/agents/:address/capabilities
+app.get("/v2/agents/:address/capabilities", (req, res) => {
+  res.json({ agentAddress: req.params.address, capabilities: passportStore.getCapabilities(req.params.address) });
+});
+
+// PUT /v2/agents/:address/capabilities — self-report capabilities (no auth required for testnet)
+app.put("/v2/agents/:address/capabilities", (req, res) => {
+  const { capabilities } = req.body;
+  if (!Array.isArray(capabilities)) return res.status(400).json({ error: "capabilities must be an array" });
+  passportStore.setCapabilities(req.params.address, capabilities);
+  res.json({ ok: true, capabilities });
+});
+
+// GET /v2/agents/:address/policies — onchain policy registry reads
+app.get("/v2/agents/:address/policies", async (req, res) => {
+  try { res.json(await passportService.getPolicies(req.params.address)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /v2/agents/:address/reputation — evidence-based reputation
+app.get("/v2/agents/:address/reputation", (req, res) => {
+  res.json({
+    agentAddress: req.params.address,
+    evidence: passportStore.getReputationEvidence(req.params.address),
+    note: "Evidence-based reputation. Not a simplistic score. Each dimension is independently verifiable.",
+  });
+});
+
+// GET /v2/agents/:address/risk — Averis Bank risk profile
+app.get("/v2/agents/:address/risk", async (req, res) => {
+  try { res.json(await passportService.getAverisData(req.params.address)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /v2/agents/:address/agreements
+app.get("/v2/agents/:address/agreements", (req, res) => {
+  res.json({ agentAddress: req.params.address, agreements: passportStore.getAgreements(req.params.address) });
+});
+
+// POST /v2/agents/:address/agreements
+app.post("/v2/agents/:address/agreements", (req, res) => {
+  passportStore.addAgreement(req.params.address, req.body);
+  res.json({ ok: true });
+});
+
+// GET /v2/agents/:address/transactions
+app.get("/v2/agents/:address/transactions", (req, res) => {
+  const { type, status, counterparty, limit, offset } = req.query;
+  res.json(passportStore.getTransactions(req.params.address, {
+    type, status, counterparty,
+    limit:  limit  ? parseInt(limit)  : 50,
+    offset: offset ? parseInt(offset) : 0,
+  }));
+});
+
+// POST /v2/agents/:address/transactions — record a transaction
+app.post("/v2/agents/:address/transactions", (req, res) => {
+  passportStore.addTransaction(req.params.address, req.body);
+  res.json({ ok: true });
+});
+
+// GET /v2/agents/:address/counterparties
+app.get("/v2/agents/:address/counterparties", (req, res) => {
+  res.json({ agentAddress: req.params.address, counterparties: passportStore.getCounterparties(req.params.address) });
+});
+
+// GET /v2/agents/:address/receipts — onchain anchors + offchain metadata
+app.get("/v2/agents/:address/receipts", async (req, res) => {
+  try { res.json(await passportService.getReceipts(req.params.address)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /v2/agents/:address/receipts/meta — record offchain receipt metadata
+app.post("/v2/agents/:address/receipts/meta", (req, res) => {
+  passportStore.addReceiptMeta(req.params.address, req.body);
+  res.json({ ok: true });
+});
+
+// POST /v2/agents/:address/identity/link — record a cross-chain identity link
+app.post("/v2/agents/:address/identity/link", (req, res) => {
+  const { caip2, agentId, registryAddress, metadataURI, linkTxHash } = req.body;
+  if (!caip2 || agentId === undefined) return res.status(400).json({ error: "caip2 and agentId required" });
+  passportStore.addIdentityLink(req.params.address, { caip2, agentId, registryAddress, metadataURI, linkTxHash });
+  res.json({ ok: true });
+});
+
+// ── 404 handler
 app.use((req, res) => {
   res.status(404).json({
     error: "Not found",

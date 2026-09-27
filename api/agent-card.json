@@ -274,6 +274,36 @@
         "name": "averis_repay",
         "auth": true,
         "description": "Returns repayObligation() calldata for OBLIGATION-mode positions (EIP-712 required)."
+      },
+      {
+        "name": "passport_get",
+        "auth": false,
+        "description": "Full agent passport: identity, ERC-8004 info, policies, receipts, reputation, risk"
+      },
+      {
+        "name": "passport_policies_list",
+        "auth": false,
+        "description": "List an agent's EIP-712 policy commitments"
+      },
+      {
+        "name": "passport_receipts_list",
+        "auth": false,
+        "description": "List an agent's verified activity receipts"
+      },
+      {
+        "name": "passport_reputation",
+        "auth": false,
+        "description": "Computed reputation score and component breakdown"
+      },
+      {
+        "name": "passport_risk",
+        "auth": false,
+        "description": "Risk assessment: default rate, exposure, concentration"
+      },
+      {
+        "name": "passport_policy_commit",
+        "auth": true,
+        "description": "Commit a new EIP-712 capability policy to the passport (EIP-712 required)"
       }
     ]
   },
@@ -285,11 +315,50 @@
     "audit_status": "unaudited \u2014 testnet only. Do not use with real funds until a third-party audit is completed.",
     "security_contact": "https://x.com/averis_protocol"
   },
+  "passport": {
+    "description": "Agent Economic Passport — a cross-chain, non-custodial identity and reputation layer for autonomous agents. Agents commit to capability policies on-chain (EIP-712), and verified economic activity is anchored as receipts. No funds held; identity is ERC-8004 linked.",
+    "api_base": "https://api.averisprotocol.xyz/v2/agents",
+    "chains": {
+      "rh_testnet": {
+        "chain_id": 46630,
+        "name": "Robinhood Chain Testnet",
+        "contracts": {
+          "AgentPolicyRegistry":  "pending — deployment in progress",
+          "AgentReceiptRegistry": "pending — deployment in progress"
+        }
+      },
+      "arc_testnet": {
+        "chain_id": 5042002,
+        "name": "Arc Testnet",
+        "note": "Financingcontracts live here; Passport contracts deploy here after RH Testnet"
+      }
+    },
+    "identity_standard": "ERC-8004",
+    "identity_registry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "passport_agent_journey": [
+      { "step": 1, "action": "GET /v2/agents/:address/passport", "description": "Full passport — identity, policies, receipts, reputation, risk" },
+      { "step": 2, "action": "GET /v2/agents/:address/policies", "description": "EIP-712 signed policy commitments and their on-chain commitment hashes" },
+      { "step": 3, "action": "POST /v2/agents/:address/policies", "description": "Commit a new capability policy (EIP-712 signed, stored offchain + optionally anchored)" },
+      { "step": 4, "action": "GET /v2/agents/:address/receipts", "description": "Verified economic activity receipts: Averis jobs, external attestations, self-reported" },
+      { "step": 5, "action": "GET /v2/agents/:address/reputation", "description": "Computed reputation score and component breakdown" },
+      { "step": 6, "action": "GET /v2/agents/:address/risk", "description": "Risk assessment: default rate, exposure, concentration metrics" }
+    ],
+    "mcp_tools": [
+      { "name": "passport_get", "auth": false, "description": "Full agent passport" },
+      { "name": "passport_policies_list", "auth": false, "description": "Agent policy commitments" },
+      { "name": "passport_receipts_list", "auth": false, "description": "Verified activity receipts" },
+      { "name": "passport_reputation", "auth": false, "description": "Reputation score" },
+      { "name": "passport_risk", "auth": false, "description": "Risk metrics" },
+      { "name": "passport_policy_commit", "auth": true, "description": "Commit a new policy" }
+    ]
+  },
   "mainnet_roadmap": [
     "Third-party security audit of AverisFinancingV2, AverisJobPool, AverisHood, AverisReserve",
+    "Third-party security audit of AgentPolicyRegistry and AgentReceiptRegistry",
     "LP deposits to seed vault liquidity",
     "Gnosis Safe multisig treasury",
     "Arc Mainnet deployment",
+    "Passport contracts on Arc Mainnet",
     "Additional ERC-8183 adapter registrations for external job protocols"
   ],
   "erc8004": {
