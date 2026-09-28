@@ -135,16 +135,21 @@ export async function getIdentity(wallet) {
 
 export async function getPolicies(wallet) {
   const policyRegistry = process.env.PASSPORT_POLICY_REGISTRY;
-  if (!policyRegistry) return { policies: [], nonce: 0, note: "PASSPORT_POLICY_REGISTRY not set" };
+  if (!policyRegistry) return { policies: [], nonce: 0, note: "PASSPORT_POLICY_REGISTRY not set — Passport contracts not yet deployed" };
 
   try {
     const client = getRhClient();
-    const policyIds = await client.readContract({
-      address: policyRegistry,
-      abi: POLICY_REGISTRY_ABI,
-      functionName: "getPolicies",
-      args: [wallet],
-    });
+    let policyIds;
+    try {
+      policyIds = await client.readContract({
+        address: policyRegistry,
+        abi: POLICY_REGISTRY_ABI,
+        functionName: "getPolicies",
+        args: [wallet],
+      });
+    } catch {
+      return { policies: [], nonce: 0, note: "Policy registry not yet deployed or unreachable on Robinhood Chain Testnet" };
+    }
     const nonce = await client.readContract({
       address: policyRegistry,
       abi: POLICY_REGISTRY_ABI,
@@ -194,12 +199,17 @@ export async function getReceipts(wallet) {
 
   try {
     const client = getRhClient();
-    const receiptIds = await client.readContract({
-      address: receiptRegistry,
-      abi: RECEIPT_REGISTRY_ABI,
-      functionName: "getReceipts",
-      args: [wallet],
-    });
+    let receiptIds;
+    try {
+      receiptIds = await client.readContract({
+        address: receiptRegistry,
+        abi: RECEIPT_REGISTRY_ABI,
+        functionName: "getReceipts",
+        args: [wallet],
+      });
+    } catch {
+      return { onchain: [], offchain: meta, note: "Receipt registry not yet deployed or unreachable on Robinhood Chain Testnet" };
+    }
 
     const onchain = await Promise.all(
       receiptIds.map(id => client.readContract({
@@ -242,9 +252,14 @@ export async function getAverisData(wallet) {
   }
 
   try {
+    // creditLimits reverts for addresses that have never interacted with the
+    // financing contract — treat a revert as 0 (no custom limit set)
+    const creditLimitSafe = readArc(financing, FINANCING_ABI, "creditLimits", [wallet])
+      .catch(() => 0n);
+
     const [creditLimit, exposure, maxPerAgent, paused, totalAssets, available, advanceRate, feeBps, protoMax] =
       await Promise.all([
-        readArc(financing, FINANCING_ABI, "creditLimits", [wallet]),
+        creditLimitSafe,
         readArc(hood,      HOOD_ABI,      "agentExposure", [wallet]),
         readArc(hood,      HOOD_ABI,      "maxExposurePerAgent"),
         readArc(hood,      HOOD_ABI,      "paused"),
