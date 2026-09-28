@@ -9,6 +9,15 @@ export const arcTestnet = defineChain({
   testnet: true,
 })
 
+export const rhTestnet = defineChain({
+  id: 46630,
+  name: 'Robinhood Chain Testnet',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } },
+  blockExplorers: { default: { name: 'RH Explorer', url: 'https://explorer.testnet.chain.robinhood.com' } },
+  testnet: true,
+})
+
 export const CONTRACTS = {
   vault:           '0xf7F47493E2f042a428a531724bE62854002979cA' as `0x${string}`,
   financing:       '0x102eC41EDdeed916012D7B345c42e7Be64AD2051' as `0x${string}`,

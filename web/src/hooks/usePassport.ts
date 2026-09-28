@@ -45,15 +45,21 @@ export function usePassportIdentity(address: string | undefined) {
   const [data, setData] = useState<any>(null)
   const [status, setStatus] = useState<PassportStatus>('idle')
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!address) return
     setStatus('loading')
-    fetchPassport(`/v2/agents/${address}/identity`)
-      .then(d => { setData(d); setStatus('ok') })
-      .catch(() => setStatus('error'))
+    try {
+      const d = await fetchPassport(`/v2/agents/${address}/identity`)
+      setData(d)
+      setStatus('ok')
+    } catch {
+      setStatus('error')
+    }
   }, [address])
 
-  return { data, status }
+  useEffect(() => { load() }, [load])
+
+  return { data, status, reload: load }
 }
 
 // ── Capabilities ──────────────────────────────────────────────────────────────

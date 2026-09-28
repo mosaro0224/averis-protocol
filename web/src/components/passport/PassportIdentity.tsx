@@ -1,10 +1,16 @@
+import { useCallback } from 'react'
 import { usePassportIdentity } from '../../hooks/usePassport'
 import { ERC8004_TESTNET } from '../../lib/passportConstants'
+import { MintIdentity } from './MintIdentity'
 
 interface Props { address: string }
 
 export function PassportIdentity({ address }: Props) {
-  const { data, status } = usePassportIdentity(address)
+  const { data, status, reload } = usePassportIdentity(address)
+
+  const handleMintSuccess = useCallback(() => {
+    reload?.()
+  }, [reload])
 
   return (
     <div className="p-8 max-w-3xl space-y-6">
@@ -15,7 +21,7 @@ export function PassportIdentity({ address }: Props) {
 
       {status === 'ok' && (
         <>
-          {/* Primary identity */}
+          {/* Primary identity — registered */}
           {data?.primaryIdentity ? (
             <div className="bg-averis-card border border-averis-line rounded p-5 space-y-3">
               <div className="flex items-center gap-2">
@@ -25,10 +31,10 @@ export function PassportIdentity({ address }: Props) {
                 )}
               </div>
               <div className="grid grid-cols-1 gap-2">
-                <Row label="Agent ID"    value={String(data.primaryIdentity.agentId)} />
-                <Row label="Wallet"      value={data.primaryIdentity.wallet} mono />
-                <Row label="Chain"       value={data.primaryIdentity.caip2} />
-                <Row label="Registry"   value={data.primaryIdentity.registryAddress} mono />
+                <Row label="Agent ID"  value={String(data.primaryIdentity.agentId)} />
+                <Row label="Wallet"    value={data.primaryIdentity.wallet} mono />
+                <Row label="Chain"     value={data.primaryIdentity.caip2} />
+                <Row label="Registry" value={data.primaryIdentity.registryAddress} mono />
                 {data.primaryIdentity.metadataURI && (
                   <div className="space-y-0.5">
                     <p className="font-mono text-[9px] text-averis-muted uppercase">Metadata URI</p>
@@ -41,19 +47,16 @@ export function PassportIdentity({ address }: Props) {
               </div>
             </div>
           ) : (
-            <div className="border border-averis-line rounded p-5 space-y-2">
-              <p className="font-mono text-[11px] text-averis-muted">No ERC-8004 identity registered on supported chains.</p>
-              <p className="font-mono text-[10px] text-averis-muted/60">
-                To register an identity, call <code className="text-averis-text">mint(wallet, agentId, metadataURI)</code> on
-                the IdentityRegistry on Arc Testnet or Robinhood Chain Testnet.
-              </p>
-            </div>
+            /* No identity — show mint form */
+            <MintIdentity address={address} onSuccess={handleMintSuccess} />
           )}
 
-          {/* All identities */}
-          {data?.identities?.length > 1 && (
+          {/* All identities across chains */}
+          {(data?.identities?.length ?? 0) > 0 && (
             <div className="space-y-3">
-              <h3 className="font-mono text-[9px] tracking-widest text-averis-muted uppercase">All Identities</h3>
+              <h3 className="font-mono text-[9px] tracking-widest text-averis-muted uppercase">
+                Identities across chains ({data.identities.length})
+              </h3>
               {data.identities.map((id: any, i: number) => (
                 <div key={i} className="bg-averis-card border border-averis-line rounded p-4 space-y-2">
                   <div className="flex items-center justify-between">
@@ -69,13 +72,27 @@ export function PassportIdentity({ address }: Props) {
             </div>
           )}
 
-          {/* Registry info */}
+          {/* Register on additional chain if only one is registered */}
+          {data?.primaryIdentity && (
+            <details className="border border-averis-line/40 rounded">
+              <summary className="font-mono text-[9px] tracking-widest text-averis-muted uppercase px-4 py-3 cursor-pointer hover:text-averis-text2 transition-colors">
+                Register on another chain
+              </summary>
+              <div className="p-4 border-t border-averis-line/40">
+                <MintIdentity address={address} onSuccess={handleMintSuccess} />
+              </div>
+            </details>
+          )}
+
+          {/* Registry reference */}
           <div className="border border-averis-line/40 rounded p-4 space-y-3">
             <h3 className="font-mono text-[9px] tracking-widest text-averis-muted uppercase">Canonical ERC-8004 Registries (Testnet)</h3>
-            <Row label="Identity Registry"    value={ERC8004_TESTNET.identityRegistry} mono />
-            <Row label="Reputation Registry"  value={ERC8004_TESTNET.reputationRegistry} mono />
-            <Row label="Validation Registry"  value={ERC8004_TESTNET.validationRegistry} mono />
-            <p className="font-mono text-[9px] text-averis-muted/60">CREATE2-deterministic. Same addresses on Arc Testnet (5042002) and Robinhood Chain Testnet (46630).</p>
+            <Row label="Identity Registry"   value={ERC8004_TESTNET.identityRegistry} mono />
+            <Row label="Reputation Registry" value={ERC8004_TESTNET.reputationRegistry} mono />
+            <Row label="Validation Registry" value={ERC8004_TESTNET.validationRegistry} mono />
+            <p className="font-mono text-[9px] text-averis-muted/60">
+              CREATE2-deterministic. Same addresses on Arc Testnet (5042002) and Robinhood Chain Testnet (46630).
+            </p>
           </div>
         </>
       )}

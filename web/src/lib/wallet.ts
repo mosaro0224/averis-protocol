@@ -1,7 +1,7 @@
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { QueryClient } from '@tanstack/react-query'
-import { arcTestnet } from './constants'
+import { arcTestnet, rhTestnet } from './constants'
 
 // Reown Project ID — public value, safe to commit
 const projectId = 'b56e18d47c72ab683b7fe84e3d4c8547'
@@ -9,7 +9,7 @@ const projectId = 'b56e18d47c72ab683b7fe84e3d4c8547'
 export const queryClient = new QueryClient()
 
 export const wagmiAdapter = new WagmiAdapter({
-  networks: [arcTestnet],
+  networks: [arcTestnet, rhTestnet],
   projectId,
 })
 
@@ -17,7 +17,7 @@ export const wagmiConfig = wagmiAdapter.wagmiConfig
 
 createAppKit({
   adapters: [wagmiAdapter],
-  networks: [arcTestnet],
+  networks: [arcTestnet, rhTestnet],
   projectId,
   metadata: {
     name: 'Averis Protocol',
