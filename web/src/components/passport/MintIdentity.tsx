@@ -165,7 +165,7 @@ export function MintIdentity({ address, onSuccess }: Props) {
                 'font-mono text-[9px] px-3 py-1.5 rounded border transition-colors cursor-pointer',
                 target === c.key
                   ? `border-averis-green bg-averis-green/10 ${c.color}`
-                  : 'border-averis-line text-averis-muted hover:border-averis-linemid bg-transparent',
+                  : 'border-[#444] text-[#aaa] hover:border-[#888] hover:text-white bg-[#1a1a1a]',
                 busy ? 'opacity-50 cursor-not-allowed' : '',
               ].join(' ')}
             >
@@ -185,7 +185,7 @@ export function MintIdentity({ address, onSuccess }: Props) {
           onChange={e => setAgentId(e.target.value)}
           placeholder="e.g. 900958"
           disabled={busy}
-          className="w-full font-mono text-[10px] bg-averis-bg border border-averis-line rounded px-3 py-2 text-averis-text placeholder:text-averis-muted/40 focus:outline-none focus:border-blue-400/50 disabled:opacity-50"
+          className="w-full font-mono text-[10px] bg-[#1a1a1a] border border-[#444] rounded px-3 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-blue-400 disabled:opacity-50"
         />
         <p className="font-mono text-[9px] text-averis-muted/60">A unique numeric ID for this agent. Must not already be minted.</p>
       </div>
@@ -199,7 +199,7 @@ export function MintIdentity({ address, onSuccess }: Props) {
           onChange={e => setMetadataURI(e.target.value)}
           placeholder="https:// or ipfs://"
           disabled={busy}
-          className="w-full font-mono text-[10px] bg-averis-bg border border-averis-line rounded px-3 py-2 text-averis-text placeholder:text-averis-muted/40 focus:outline-none focus:border-blue-400/50 disabled:opacity-50"
+          className="w-full font-mono text-[10px] bg-[#1a1a1a] border border-[#444] rounded px-3 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-blue-400 disabled:opacity-50"
         />
         <p className="font-mono text-[9px] text-averis-muted/60">URL or IPFS hash pointing to an agent.json describing this agent.</p>
       </div>

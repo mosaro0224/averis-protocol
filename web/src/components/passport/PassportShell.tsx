@@ -65,7 +65,7 @@ export function PassportShell({ onBack }: Props) {
               value={lookupAddress}
               onChange={e => setLookupAddress(e.target.value)}
               placeholder="0x... lookup any address"
-              className="font-mono text-[10px] bg-averis-card border border-averis-line rounded px-2 py-1 w-60 text-averis-text placeholder:text-averis-muted/40 focus:outline-none focus:border-blue-400/50"
+              className="font-mono text-[10px] bg-[#1a1a1a] border border-[#444] rounded px-2 py-1 w-60 text-white placeholder:text-[#666] focus:outline-none focus:border-blue-400"
             />
             <button
               type="submit"
