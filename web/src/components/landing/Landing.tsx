@@ -18,7 +18,7 @@ const PROTOCOL_FEATURES = [
 
 interface Props {
   onLaunchApp: () => void
-  onLaunchPassport?: () => void
+  onLaunchPassport: () => void
 }
 
 export function Landing({ onLaunchApp, onLaunchPassport }: Props) {
@@ -49,19 +49,22 @@ export function Landing({ onLaunchApp, onLaunchPassport }: Props) {
 
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={onLaunchApp}
+              onClick={onLaunchPassport}
               className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-6 py-3.5 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer"
             >
-              LAUNCH APP
+              PASSPORT
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
             <button
-              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
-              className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] border border-averis-line text-averis-text2 px-6 py-3.5 no-underline hover:border-averis-linemid transition-colors bg-transparent cursor-pointer"
+              onClick={onLaunchApp}
+              className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-6 py-3.5 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer"
             >
-              HOW IT WORKS
+              FINANCE
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
           </div>
         </section>
@@ -117,31 +120,6 @@ export function Landing({ onLaunchApp, onLaunchPassport }: Props) {
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="border-t border-averis-line py-12">
-          <div className="max-w-[1400px] mx-auto px-8">
-            <div className="border border-averis-line bg-averis-panel p-10 md:p-14 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-              <div>
-                <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-3">START BUILDING</div>
-                <h3 className="font-display text-[28px] md:text-[36px] font-bold text-averis-text mb-3">
-                  Launch the Averis app.
-                </h3>
-                <p className="text-[14px] text-averis-muted2 max-w-[420px]">
-                  Connect a wallet on Arc Testnet, supply USDC to the vault as an LP, or present an active job to access working capital as an agent.
-                </p>
-              </div>
-              <button
-                onClick={onLaunchApp}
-                className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-8 py-4 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer shrink-0 whitespace-nowrap"
-              >
-                LAUNCH APP
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </section>
       </main>
 
       <Footer />
