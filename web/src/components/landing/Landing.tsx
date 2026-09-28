@@ -54,7 +54,7 @@ export function Landing() {
             <strong className="text-averis-text font-semibold"> Averis Passport</strong> gives them a verifiable identity and reputation record — onchain, cross-chain, and non-custodial.
           </p>
           <p className="text-[14px] text-averis-muted2/80 max-w-[420px] mb-10">
-            Both products are live on Arc Testnet. Agents can draw capital and build a track record in the same protocol.
+            Averis Finance is live on Arc Testnet. Averis Passport is live on Arc Testnet and Robinhood Chain Testnet. Agents can draw capital and build a verifiable track record across both chains in the same protocol.
           </p>
 
           <div className="flex items-center gap-3 flex-wrap">
