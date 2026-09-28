@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { AppNav, AppTab } from './AppNav'
 import { Overview }  from './Overview'
@@ -13,9 +14,8 @@ import { EXPLORER }  from '../../lib/constants'
 
 const LS_TAB = '_av_tab'
 
-interface Props { onBack: () => void; onPassport?: () => void }
-
-export function App({ onBack, onPassport }: Props) {
+export function App() {
+  const navigate = useNavigate()
   const { address } = useAccount()
   const [tab, setTab] = useState<AppTab>(() => (localStorage.getItem(LS_TAB) as AppTab) ?? 'overview')
 
@@ -26,7 +26,7 @@ export function App({ onBack, onPassport }: Props) {
       {/* Inner nav bar */}
       <div className="border-b border-averis-line sticky top-0 bg-[#09100c] z-40">
         <div className="w-full px-8 h-12 flex items-center gap-4">
-          <button onClick={onBack} className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer text-averis-muted hover:text-averis-text transition-colors p-0">
+          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer text-averis-muted hover:text-averis-text transition-colors p-0">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
               <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
@@ -47,14 +47,12 @@ export function App({ onBack, onPassport }: Props) {
                 {address.slice(0, 6)}…{address.slice(-4)}
               </a>
             )}
-            {onPassport && (
-              <button
-                onClick={onPassport}
-                className="font-mono text-[9px] tracking-[0.06em] text-averis-muted2 hover:text-averis-text border border-averis-line/50 px-3 py-1 bg-transparent transition-colors cursor-pointer rounded"
-              >
-                PASSPORT
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/passport')}
+              className="font-mono text-[9px] tracking-[0.06em] text-averis-muted2 hover:text-averis-text border border-averis-line/50 px-3 py-1 bg-transparent transition-colors cursor-pointer rounded"
+            >
+              PASSPORT
+            </button>
             <appkit-button size="sm" />
           </div>
         </div>

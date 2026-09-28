@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Nav }    from '../ui/Nav'
 import { Footer } from '../ui/Footer'
 
@@ -23,15 +24,13 @@ const HOW_IT_WORKS = [
   { n: '05', title: 'Settlement repays vault', body: 'When the job completes, the ReceivableRouter sweeps the escrow payout to the vault. Fee charged at settlement.' },
 ]
 
-interface Props {
-  onLaunchApp: () => void
-  onLaunchPassport: () => void
-}
-
-export function Landing({ onLaunchApp, onLaunchPassport }: Props) {
+export function Landing() {
+  const navigate = useNavigate()
+  const onLaunchApp      = () => navigate('/finance')
+  const onLaunchPassport = () => navigate('/passport')
   return (
     <div className="min-h-dvh bg-averis-bg text-averis-text flex flex-col">
-      <Nav onLaunchApp={onLaunchApp} onLaunchPassport={onLaunchPassport} />
+      <Nav />
 
       <main className="flex-1">
         {/* Hero */}

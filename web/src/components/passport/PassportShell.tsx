@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { PassportNav, type PassportTab } from './PassportNav'
 import { PassportOverview }      from './PassportOverview'
@@ -15,11 +16,8 @@ import { AverisLogo } from '../ui/AverisLogo'
 
 const LS_PASSPORT_TAB = '_av_passport_tab'
 
-interface Props {
-  onBack: () => void
-}
-
-export function PassportShell({ onBack }: Props) {
+export function PassportShell() {
+  const navigate = useNavigate()
   const { address } = useAccount()
   const [tab, setTab] = useState<PassportTab>(
     () => (localStorage.getItem(LS_PASSPORT_TAB) as PassportTab) ?? 'overview'
@@ -45,7 +43,7 @@ export function PassportShell({ onBack }: Props) {
       <div className="border-b border-averis-line sticky top-0 bg-[#09100c] z-40">
         <div className="w-full px-8 h-12 flex items-center gap-4">
           <button
-            onClick={onBack}
+            onClick={() => navigate('/')}
             className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer text-averis-muted hover:text-averis-text transition-colors p-0"
           >
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
