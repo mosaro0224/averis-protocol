@@ -27,7 +27,7 @@ export function PassportCapabilities({ address }: Props) {
   }
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">CAPABILITIES</h2>
         {!editing && (

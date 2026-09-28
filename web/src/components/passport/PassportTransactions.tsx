@@ -22,7 +22,7 @@ export function PassportTransactions({ address }: Props) {
   })
 
   return (
-    <div className="p-8 max-w-4xl space-y-6">
+    <div className="p-8 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">TRANSACTIONS</h2>
         <div className="flex gap-2">

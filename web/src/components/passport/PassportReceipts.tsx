@@ -14,7 +14,7 @@ export function PassportReceipts({ address }: Props) {
   const contractDeployed = Boolean(PASSPORT_CONTRACTS.receiptRegistry)
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">ECONOMIC RECEIPTS</h2>
         <p className="font-mono text-[9px] text-averis-muted/60 mt-1">Verifiable onchain anchors for economic events. Append-only. No raw data stored onchain.</p>

@@ -17,7 +17,7 @@ export function PassportRisk({ address }: Props) {
   const cfg    = TIER_CONFIG[tier] ?? TIER_CONFIG.UNRATED
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">RISK PROFILE</h2>
         <p className="font-mono text-[9px] text-averis-muted/60 mt-1">Derived from live Averis Bank contract state on Arc Testnet.</p>

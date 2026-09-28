@@ -19,7 +19,7 @@ export function PassportReputation({ address }: Props) {
   const ev = data?.evidence
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">REPUTATION EVIDENCE</h2>
         <p className="font-mono text-[9px] text-averis-muted/60 mt-1">Evidence-based. Not a score. Each dimension is independently verifiable.</p>

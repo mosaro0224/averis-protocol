@@ -107,7 +107,7 @@ export function PassportShell({ onBack }: Props) {
 
       {/* Content */}
       {activeAddress ? (
-        <div className="flex-1">
+        <div className="flex-1 w-full">
           {tab === 'overview'       && <PassportOverview      address={activeAddress} onNav={setTab} />}
           {tab === 'identity'       && <PassportIdentity      address={activeAddress} />}
           {tab === 'capabilities'   && <PassportCapabilities  address={activeAddress} />}

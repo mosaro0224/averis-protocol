@@ -13,7 +13,7 @@ export function PassportIdentity({ address }: Props) {
   }, [reload])
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">ERC-8004 IDENTITY</h2>
 
       {status === 'loading' && <p className="font-mono text-[11px] text-averis-muted">Loading identity...</p>}

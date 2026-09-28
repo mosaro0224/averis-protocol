@@ -6,7 +6,7 @@ export function PassportAgreements({ address }: Props) {
   const { data, status } = usePassportAgreements(address)
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">AGREEMENTS</h2>
         <p className="font-mono text-[9px] text-averis-muted/60 mt-1">Job commitments and multi-party agreements involving this agent.</p>

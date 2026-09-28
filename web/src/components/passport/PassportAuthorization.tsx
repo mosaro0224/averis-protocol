@@ -35,7 +35,7 @@ export function PassportAuthorization({ address }: Props) {
   const contractDeployed = Boolean(PASSPORT_CONTRACTS.policyRegistry)
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted">AUTHORIZATION POLICIES</h2>
 
       {!contractDeployed && (

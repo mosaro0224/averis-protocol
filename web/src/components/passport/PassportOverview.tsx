@@ -45,7 +45,7 @@ export function PassportOverview({ address, onNav }: Props) {
   const averis = data?.averisBank
 
   return (
-    <div className="p-8 max-w-5xl space-y-8">
+    <div className="p-8 max-w-5xl mx-auto space-y-8">
       {/* Header */}
       <div>
         <h2 className="font-mono text-[11px] tracking-[0.18em] text-averis-muted mb-1">AGENT ECONOMIC PASSPORT</h2>
