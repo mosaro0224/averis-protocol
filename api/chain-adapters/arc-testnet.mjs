@@ -10,7 +10,14 @@
  */
 
 import { createPublicClient, http, parseAbi } from "viem";
-import { ERC8004_TESTNET } from "./index.mjs";
+
+// Defined locally to avoid circular import with index.mjs
+// (index.mjs imports this file, so we cannot import from index.mjs here)
+const ERC8004_TESTNET = {
+  identityRegistry:   "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+  reputationRegistry: "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+  validationRegistry: "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
+};
 
 const ARC_RPC = process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io";
 
