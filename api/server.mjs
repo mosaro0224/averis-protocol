@@ -27,6 +27,15 @@ const OPENAPI    = _require("./openapi.json");
 const app  = express();
 app.use(express.json());
 
+// ── Global CORS — allow all origins (public read-only API) ─────────────────
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Agent-Signature, Mcp-Session-Id");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  next();
+});
+
 // ── Chain / RPC configuration ──────────────────────────────────────────────
 
 const ARC_CHAIN_ID    = Number(process.env.ARC_CHAIN_ID || 5042002);
