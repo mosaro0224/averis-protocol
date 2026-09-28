@@ -29,14 +29,14 @@ export function PassportTransactions({ address }: Props) {
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
-            className="font-mono text-[10px] text-averis-text bg-averis-card border border-averis-line rounded px-2 py-1 cursor-pointer"
+            className="font-mono text-[10px] text-white bg-[#1a1a1a] border border-[#444] rounded px-2 py-1 cursor-pointer focus:outline-none focus:border-blue-400"
           >
             {TX_TYPES.map(t => <option key={t} value={t}>{t || 'All types'}</option>)}
           </select>
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="font-mono text-[10px] text-averis-text bg-averis-card border border-averis-line rounded px-2 py-1 cursor-pointer"
+            className="font-mono text-[10px] text-white bg-[#1a1a1a] border border-[#444] rounded px-2 py-1 cursor-pointer focus:outline-none focus:border-blue-400"
           >
             {TX_STATUSES.map(s => <option key={s} value={s}>{s || 'All statuses'}</option>)}
           </select>
