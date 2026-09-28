@@ -1,19 +1,26 @@
 import { Nav }    from '../ui/Nav'
 import { Footer } from '../ui/Footer'
 
+const PASSPORT_FEATURES = [
+  { title: 'Onchain identity', body: 'Every agent mints an ERC-8004 identity token on Arc Testnet or Robinhood Chain Testnet. The token is non-transferable and ties all activity to a single verifiable wallet.' },
+  { title: 'Policy commitments', body: 'Agents commit to capability policies using EIP-712 signatures stored in AgentPolicyRegistry. Policies are versioned, revocable, and domain-separated from financing.' },
+  { title: 'Verified receipts', body: 'AgentReceiptRegistry holds an append-only record of completed economic activity — SELF_REPORTED, AVERIS_VERIFIED, or EXTERNAL_ATTESTER. No raw data stored onchain.' },
+  { title: 'Cross-chain reputation', body: 'The same identity and reputation record is readable on both Arc Testnet and Robinhood Chain Testnet via CREATE2-deterministic registry addresses.' },
+]
+
+const FINANCE_FEATURES = [
+  { title: 'Non-recourse advances', body: 'Repayment flows through the receivable lien — never from the agent\'s own funds. If a job defaults, loss is absorbed by vault NAV.' },
+  { title: 'Job-controlled pools', body: 'Capital is isolated per job in a permissioned spending pool. No single position can drain the vault.' },
+  { title: 'External job support', body: 'Finance jobs on any whitelisted external platform via ExternalJobAdapter — not limited to AverisACP.' },
+  { title: 'Programmable credit', body: 'Per-agent limits set by AverisHood. Exposure governed by AverisReserve. Terms adjustable by protocol owner.' },
+]
+
 const HOW_IT_WORKS = [
-  { n: '01', title: 'Agent gets hired', body: 'A human client funds a job in an escrow contract. The agent (your AI) is assigned as provider.' },
+  { n: '01', title: 'Agent gets hired', body: 'A human client funds a job in an escrow contract. The agent is assigned as provider.' },
   { n: '02', title: 'Agent requests financing', body: 'The agent calls draw() — Averis verifies the funded escrow and advances up to 40% of the budget.' },
   { n: '03', title: 'Capital goes to a pool', body: 'Funds are deployed to an isolated, permissioned spending pool — not the agent\'s wallet.' },
   { n: '04', title: 'Agent executes the job', body: 'The agent spends from the pool on approved vendors, APIs, and sub-agents.' },
   { n: '05', title: 'Settlement repays vault', body: 'When the job completes, the ReceivableRouter sweeps the escrow payout to the vault. Fee charged at settlement.' },
-]
-
-const PROTOCOL_FEATURES = [
-  { title: 'Non-recourse advances', body: 'Repayment flows through the receivable lien — never from the agent\'s own funds.' },
-  { title: 'Job-controlled pools', body: 'Capital is isolated per job. No single position can drain the vault.' },
-  { title: 'External job support', body: 'Finance jobs on any whitelisted external platform via ExternalJobAdapter.' },
-  { title: 'Programmable credit', body: 'Per-agent limits set by AverisHood. Exposure governed by AverisReserve.' },
 ]
 
 interface Props {
@@ -42,9 +49,13 @@ export function Landing({ onLaunchApp, onLaunchPassport }: Props) {
             AI agents.
           </h1>
 
-          <p className="text-[15px] text-averis-muted2 max-w-[420px] mb-10">
-            Averis gives AI agents temporary access to capital so they can finish the jobs they have already been hired to complete.
-            Credit backed by verified on-chain receivables.
+          <p className="text-[15px] text-averis-muted2 max-w-[480px] mb-4">
+            Averis is two-product infrastructure for the agentic economy.
+            <strong className="text-averis-text font-semibold"> Averis Finance</strong> gives AI agents job-backed working capital.
+            <strong className="text-averis-text font-semibold"> Averis Passport</strong> gives them a verifiable identity and reputation record — onchain, cross-chain, and non-custodial.
+          </p>
+          <p className="text-[14px] text-averis-muted2/80 max-w-[420px] mb-10">
+            Both products are live on Arc Testnet. Agents can draw capital and build a track record in the same protocol.
           </p>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -69,10 +80,124 @@ export function Landing({ onLaunchApp, onLaunchPassport }: Props) {
           </div>
         </section>
 
-        {/* How it works */}
+        {/* Two products */}
+        <section className="border-t border-averis-line py-20">
+          <div className="max-w-[1400px] mx-auto px-8">
+            <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-4">TWO PRODUCTS. ONE PROTOCOL.</div>
+            <h2 className="font-display text-[32px] font-bold text-averis-text mb-12 max-w-[600px]">
+              Identity and capital, built for agents that do real work.
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-averis-line border border-averis-line">
+              {/* Passport card */}
+              <div className="bg-averis-panel p-8 space-y-5">
+                <div>
+                  <div className="font-mono text-[9px] tracking-[0.18em] text-averis-green mb-2">AVERIS PASSPORT</div>
+                  <div className="font-display text-[22px] font-bold text-averis-text mb-3">
+                    Verifiable identity and reputation for AI agents.
+                  </div>
+                  <p className="text-[14px] text-averis-muted2">
+                    An agent without a track record is indistinguishable from one that has defaulted ten times. Averis Passport gives every agent a permanent, cross-chain record of who they are, what they can do, and what they have done — all verifiable onchain without trusting any third party.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2">
+                  {[
+                    ['ERC-8004 identity token', 'Minted per wallet. Non-transferable. Readable on Arc and Robinhood Chain.'],
+                    ['Policy commitments', 'EIP-712 signed capability declarations stored in AgentPolicyRegistry.'],
+                    ['Economic receipts', 'Append-only record in AgentReceiptRegistry. Three verification tiers.'],
+                    ['Reputation score', 'Derived from verified receipts, policy consistency, and financing history.'],
+                  ].map(([title, body]) => (
+                    <div key={title} className="flex gap-3 py-2 border-t border-averis-line/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-averis-green mt-1.5 shrink-0" />
+                      <div>
+                        <div className="font-mono text-[10px] text-averis-text mb-0.5">{title}</div>
+                        <div className="text-[13px] text-averis-muted2">{body}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={onLaunchPassport}
+                  className="font-mono text-[10px] tracking-[0.06em] border border-averis-green text-averis-green px-4 py-2 hover:bg-averis-green hover:text-averis-greendark transition-colors bg-transparent cursor-pointer mt-2"
+                >
+                  OPEN PASSPORT →
+                </button>
+              </div>
+
+              {/* Finance card */}
+              <div className="bg-averis-panel p-8 space-y-5">
+                <div>
+                  <div className="font-mono text-[9px] tracking-[0.18em] text-averis-green mb-2">AVERIS FINANCE</div>
+                  <div className="font-display text-[22px] font-bold text-averis-text mb-3">
+                    Job-backed working capital, drawn in one transaction.
+                  </div>
+                  <p className="text-[14px] text-averis-muted2">
+                    AI agents are increasingly hired to do real work — research, code, data pipelines, sub-agent orchestration. They often need capital mid-job before the client settles. Averis Finance provides that bridge: the agent draws against a verified job receivable and repays automatically when the job completes. No treasury. No personal debt.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2">
+                  {[
+                    ['40% advance rate', 'Draw up to 40% of job budget. Minimum of advance rate, agent limit, and available vault liquidity.'],
+                    ['2% flat fee', 'Added at repayment — not deducted at draw. Agent receives the full advance amount.'],
+                    ['Controlled spending pool', 'Capital is isolated per job. Spent only on approved recipients.'],
+                    ['Non-recourse', 'If a job defaults, loss is absorbed by vault NAV. No agent blacklist.'],
+                  ].map(([title, body]) => (
+                    <div key={title} className="flex gap-3 py-2 border-t border-averis-line/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-averis-green mt-1.5 shrink-0" />
+                      <div>
+                        <div className="font-mono text-[10px] text-averis-text mb-0.5">{title}</div>
+                        <div className="text-[13px] text-averis-muted2">{body}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={onLaunchApp}
+                  className="font-mono text-[10px] tracking-[0.06em] border border-averis-green text-averis-green px-4 py-2 hover:bg-averis-green hover:text-averis-greendark transition-colors bg-transparent cursor-pointer mt-2"
+                >
+                  OPEN FINANCE →
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Passport features */}
+        <section className="border-t border-averis-line py-20">
+          <div className="max-w-[1400px] mx-auto px-8">
+            <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-4">AVERIS PASSPORT</div>
+            <h2 className="font-display text-[32px] font-bold text-averis-text mb-3">Your agent's permanent record.</h2>
+            <p className="text-[15px] text-averis-muted2 max-w-[560px] mb-12">
+              Averis Passport is not a financing product. It is an identity and track-record layer — an independent protocol layer that any agent or platform can read without going through Averis Finance.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-averis-line border border-averis-line">
+              {PASSPORT_FEATURES.map(f => (
+                <div key={f.title} className="bg-averis-panel p-7">
+                  <div className="font-display text-[16px] font-semibold text-averis-text mb-2">{f.title}</div>
+                  <div className="text-[14px] text-averis-muted2">{f.body}</div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-averis-line border border-averis-line mt-px">
+              {[
+                ['CHAINS', 'Arc + Robinhood'],
+                ['IDENTITY STANDARD', 'ERC-8004'],
+                ['POLICY SIGNATURES', 'EIP-712'],
+                ['RECEIPT STORAGE', 'Append-only'],
+              ].map(([label, value]) => (
+                <div key={label} className="p-4">
+                  <div className="font-mono text-[9px] tracking-[0.14em] text-averis-muted mb-2">{label}</div>
+                  <div className="font-mono text-[13px] text-averis-text">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* How Finance works */}
         <section id="how-it-works" className="border-t border-averis-line py-20">
           <div className="max-w-[1400px] mx-auto px-8">
-            <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-4">HOW IT WORKS</div>
+            <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-4">HOW AVERIS FINANCE WORKS</div>
             <h2 className="font-display text-[32px] font-bold text-averis-text mb-12">From hired to funded in one call.</h2>
             <div className="space-y-0">
               {HOW_IT_WORKS.map((item, i) => (
@@ -95,7 +220,7 @@ export function Landing({ onLaunchApp, onLaunchPassport }: Props) {
             <div className="font-mono text-[9px] tracking-[0.18em] text-averis-muted mb-4">PROTOCOL</div>
             <h2 className="font-display text-[32px] font-bold text-averis-text mb-12">Built for the agentic economy.</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-averis-line border border-averis-line">
-              {PROTOCOL_FEATURES.map(f => (
+              {FINANCE_FEATURES.map(f => (
                 <div key={f.title} className="bg-averis-panel p-7">
                   <div className="font-display text-[16px] font-semibold text-averis-text mb-2">{f.title}</div>
                   <div className="text-[14px] text-averis-muted2">{f.body}</div>

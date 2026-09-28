@@ -1,11 +1,10 @@
 {
   "schema_version": "1.0",
   "name": "Averis Protocol",
-  "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs — an agent with an active, funded job can request a temporary controlled spending pool to bridge a capital shortfall and complete the job. Principal and fees are repaid automatically from the job receivable.",
+  "description": "Two-product onchain infrastructure for autonomous AI agents. Averis Finance provides job-backed working capital \u2014 an agent with a funded job draws a controlled spending pool and repays automatically from the job receivable. Averis Passport provides verifiable onchain identity and reputation \u2014 ERC-8004 identity tokens, EIP-712 policy commitments, and an append-only receipt registry, readable cross-chain.",
   "url": "https://averisprotocol.xyz",
   "status": "testnet",
   "network_note": "Currently live on Arc Testnet (chain 5042002). Mainnet deployment is on the roadmap. USDC on this network has no real-world value.",
-
   "api": {
     "base_url": "https://api.averisprotocol.xyz",
     "version": "v2",
@@ -14,7 +13,6 @@
     "mcp": "https://api.averisprotocol.xyz/v1/mcp",
     "health": "https://api.averisprotocol.xyz/health"
   },
-
   "capabilities": [
     "agent_working_capital",
     "agent_financing",
@@ -25,9 +23,16 @@
     "agentic_finance",
     "job_backed_credit",
     "controlled_spending_pool",
-    "receivable_financing"
+    "receivable_financing",
+    "external_job_financing",
+    "agent_identity",
+    "agent_reputation",
+    "erc8004_identity",
+    "policy_commitments",
+    "economic_receipts",
+    "cross_chain_reputation",
+    "agent_passport"
   ],
-
   "keywords": [
     "agent working capital",
     "agent financing",
@@ -43,9 +48,17 @@
     "spending pool",
     "receivable financing",
     "on-chain working capital",
-    "agent liquidity provider"
+    "agent liquidity provider",
+    "agent identity",
+    "agent reputation",
+    "ERC-8004",
+    "policy registry",
+    "receipt registry",
+    "agent passport",
+    "cross-chain identity",
+    "onchain reputation",
+    "verifiable agent identity"
   ],
-
   "protocol_terms": {
     "note": "Live values read from AverisFinancingV2 on Arc Testnet. These are the actual on-chain parameters.",
     "advance_rate_pct": 40,
@@ -72,7 +85,6 @@
       "note": "Agent draws 400 and receives 400 in the controlled spending pool. No fee is deducted at draw. The 8 USDC fee (2%) is added at repayment. At settlement: Averis receives 408 (principal 400 + fee 8), agent receives 592 plus any unspent pool balance. Total agent cost = 8 USDC."
     }
   },
-
   "protocol_status": {
     "note": "Static values only. For live TVL, liquidity, and hood status query GET /v1/discover or the averis_protocol_status MCP tool.",
     "live_status_endpoint": "https://api.averisprotocol.xyz/v1/discover",
@@ -80,9 +92,8 @@
     "contracts_wired": true,
     "adapter_registered": true
   },
-
   "eligibility_requirements": [
-    "Job must exist in a registered adapter protocol (AverisACP or ERC-8183 compatible)",
+    "Job must exist in a registered adapter protocol (AverisACP, ExternalJobAdapter, or any ERC-8183 compatible platform whitelisted by the protocol owner)",
     "Job must be funded and active (status: FUNDED)",
     "Caller must be the job provider/agent address",
     "Job payout receiver must be set to AverisReceivableRouter before funding (LIEN mode) or agent must sign EIP-712 RepaymentObligation (OBLIGATION mode)",
@@ -90,27 +101,39 @@
     "Job must not already have an active financing position",
     "Requested amount must not exceed the minimum of: 40% of job budget, the agent credit limit, the protocol maximum (50,000 USDC), and available vault liquidity"
   ],
-
   "repayment_note": "Non-recourse financing. If a job fails, is rejected, or expires: unspent pool capital is swept back to vault automatically, net loss is written off against vault NAV, and agent exposure is released. No personal liability, no on-chain blacklist. The protocol owner may reduce an agent's credit limit after repeated defaults. Protocol terms (advance rate, fee, caps) are owner-adjustable.",
-
   "repayment": {
-    "mode_lien": "Automatic — job settlement routed through ReceivableRouter → AverisFinancingV2 → vault. No agent action required.",
+    "mode_lien": "Automatic \u2014 job settlement routed through ReceivableRouter \u2192 AverisFinancingV2 \u2192 vault. No agent action required.",
     "mode_obligation": "EIP-712 signed repayment obligation. Agent must call repayObligation() after settlement.",
     "default_handling": "If job expires or is rejected, unused pool capital is returned to vault. Net loss is written off against vault NAV."
   },
-
   "authentication": {
     "type": "eip712",
     "description": "Mutating requests require an EIP-712 signature over {agentAddress, nonce, expiry, chainId} in the X-Agent-Signature header. Discovery, eligibility, and quote endpoints are unauthenticated.",
     "header": "X-Agent-Signature",
-    "domain": { "name": "AverisProtocol", "version": "2" },
+    "domain": {
+      "name": "AverisProtocol",
+      "version": "2"
+    },
     "primaryType": "AgentRequest",
     "types": {
       "AgentRequest": [
-        { "name": "agentAddress", "type": "address" },
-        { "name": "nonce",        "type": "uint256" },
-        { "name": "expiry",       "type": "uint256" },
-        { "name": "chainId",      "type": "uint256" }
+        {
+          "name": "agentAddress",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint256"
+        },
+        {
+          "name": "expiry",
+          "type": "uint256"
+        },
+        {
+          "name": "chainId",
+          "type": "uint256"
+        }
       ]
     },
     "unauthenticated_endpoints": [
@@ -130,7 +153,6 @@
       "POST /v1/mcp (averis_request_funding, averis_repay)"
     ]
   },
-
   "chain": {
     "id": 5042002,
     "name": "Arc Testnet",
@@ -141,63 +163,326 @@
     "explorer": "https://explorer.testnet.arc.io",
     "block_time_ms": 500
   },
-
   "contracts": {
-    "AverisVault":           "0xf7F47493E2f042a428a531724bE62854002979cA",
-    "AverisFinancingV2":     "0x102eC41EDdeed916012D7B345c42e7Be64AD2051",
-    "AverisACP":             "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
-    "ReceivableRouter":      "0x0b2C571D2FD5199b758d426340CF8260515eFF15",
-    "AverisHood":            "0xd7D8633804FfdB3504Ba6F8036b26536f3d89E0a",
-    "AverisPoolFactory":     "0x69e875801822ffcA3C34022a2E2363d26688259a",
+    "AverisVault": "0xf7F47493E2f042a428a531724bE62854002979cA",
+    "AverisFinancingV2": "0x102eC41EDdeed916012D7B345c42e7Be64AD2051",
+    "AverisACP": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+    "ReceivableRouter": "0x0b2C571D2FD5199b758d426340CF8260515eFF15",
+    "AverisHood": "0xd7D8633804FfdB3504Ba6F8036b26536f3d89E0a",
+    "AverisPoolFactory": "0x69e875801822ffcA3C34022a2E2363d26688259a",
     "AverisAdapterRegistry": "0x0D6DBfaeAf74b45642064E6bA27F02c69872f4B0",
-    "AverisCredit":          "0x9330790C74E71f16ef568c4CD6ca06662A611dd9",
-    "AverisReserve":         "0x9069f069467578c1F4B6f2385c6B52Ca86f8DDf5",
-    "AverisACPAdapter":      "0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A"
+    "AverisCredit": "0x9330790C74E71f16ef568c4CD6ca06662A611dd9",
+    "AverisReserve": "0x9069f069467578c1F4B6f2385c6B52Ca86f8DDf5",
+    "AverisACPAdapter": "0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A",
+    "ExternalJobAdapter": "0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb"
   },
-
   "agent_journey": [
-    { "step": 1, "action": "discover",    "endpoint": "GET /v1/discover",                  "auth": false, "description": "Get capabilities, contracts, live parameters, and auth instructions" },
-    { "step": 2, "action": "eligibility", "endpoint": "GET /v1/agents/{address}/eligibility", "auth": false, "description": "Check credit profile, available credit, and active exposure" },
-    { "step": 3, "action": "verify_job",  "endpoint": "POST /v2/jobs/verify",              "auth": false, "description": "Confirm job is funded, active, and lien is correctly established" },
-    { "step": 4, "action": "quote",       "endpoint": "POST /v2/credit/quote",             "auth": false, "description": "Get financing terms: approved amount, fee, total repayment, expiry" },
-    { "step": 5, "action": "fund",        "endpoint": "on-chain AverisFinancingV2.draw()", "auth": true,  "description": "Submit draw() transaction — creates job-specific controlled spending pool" },
-    { "step": 6, "action": "pool_status", "endpoint": "GET /v2/pools/:poolAddress",        "auth": false, "description": "Monitor pool balance, spending limits, allowed recipients, and expiry" },
-    { "step": 7, "action": "spend",       "endpoint": "POST /v2/pools/:poolAddress/spend", "auth": true,  "description": "Get validated spend() calldata — agent submits from its own wallet" },
-    { "step": 8, "action": "position",    "endpoint": "GET /v2/positions/:jobId",          "auth": false, "description": "Track financing position lifecycle and automatic repayment status" },
-    { "step": 9, "action": "settlement",  "endpoint": "automatic on-chain",                "auth": false, "description": "Job settlement triggers ReceivableRouter — principal + fee repaid, remainder to agent" }
+    {
+      "step": 1,
+      "action": "discover",
+      "endpoint": "GET /v1/discover",
+      "auth": false,
+      "description": "Get capabilities, contracts, live parameters, and auth instructions"
+    },
+    {
+      "step": 2,
+      "action": "eligibility",
+      "endpoint": "GET /v1/agents/{address}/eligibility",
+      "auth": false,
+      "description": "Check credit profile, available credit, and active exposure"
+    },
+    {
+      "step": 3,
+      "action": "verify_job",
+      "endpoint": "POST /v2/jobs/verify",
+      "auth": false,
+      "description": "Confirm job is funded, active, and lien is correctly established"
+    },
+    {
+      "step": 4,
+      "action": "quote",
+      "endpoint": "POST /v2/credit/quote",
+      "auth": false,
+      "description": "Get financing terms: approved amount, fee, total repayment, expiry, and terms_hash. Verify terms_hash hasn't changed before submitting draw()."
+    },
+    {
+      "step": 5,
+      "action": "fund",
+      "endpoint": "on-chain AverisFinancingV2.draw()",
+      "auth": true,
+      "description": "Submit draw() transaction \u2014 creates job-specific controlled spending pool"
+    },
+    {
+      "step": 6,
+      "action": "pool_status",
+      "endpoint": "GET /v2/pools/:poolAddress",
+      "auth": false,
+      "description": "Monitor pool balance, spending limits, allowed recipients, and expiry"
+    },
+    {
+      "step": 7,
+      "action": "spend",
+      "endpoint": "POST /v2/pools/:poolAddress/spend",
+      "auth": true,
+      "description": "Get validated spend() calldata \u2014 agent submits from its own wallet"
+    },
+    {
+      "step": 8,
+      "action": "position",
+      "endpoint": "GET /v2/positions/:jobId",
+      "auth": false,
+      "description": "Track financing position lifecycle and automatic repayment status"
+    },
+    {
+      "step": 9,
+      "action": "settlement",
+      "endpoint": "automatic on-chain",
+      "auth": false,
+      "description": "Job settlement triggers ReceivableRouter \u2014 principal + fee repaid, remainder to agent"
+    }
   ],
-
   "mcp": {
     "endpoint": "https://api.averisprotocol.xyz/v1/mcp",
     "protocol": "MCP/1.0",
     "description": "Model Context Protocol endpoint. Exposes all agent capabilities as structured tools for MCP-compatible AI frameworks. Send {method: 'tools/list'} to enumerate all tools.",
     "tools": [
-      { "name": "averis_discover",         "auth": false, "description": "Full protocol overview, parameters, contracts, and agent journey" },
-      { "name": "averis_protocol_status",  "auth": false, "description": "Live TVL, liquidity, utilization, and Hood circuit-breaker status" },
-      { "name": "averis_check_eligibility","auth": false, "description": "Agent credit profile: limit, exposure, available credit, active jobs" },
-      { "name": "averis_verify_job",       "auth": false, "description": "Verify job eligibility for financing" },
-      { "name": "averis_get_quote",        "auth": false, "description": "Financing quote: approved amount, fee, repayment, expiry" },
-      { "name": "averis_request_funding",  "auth": true,  "description": "Returns draw() calldata for agent to submit on-chain (EIP-712 required)" },
-      { "name": "averis_pool_status",      "auth": false, "description": "Pool balance, spent, recipients, expiry, freeze status" },
-      { "name": "averis_position_status",  "auth": false, "description": "Full financing position state and repayment tracking" },
-      { "name": "averis_repay",            "auth": true,  "description": "Returns repayObligation() calldata for OBLIGATION-mode positions (EIP-712 required)." }
+      {
+        "name": "averis_discover",
+        "auth": false,
+        "description": "Full protocol overview, parameters, contracts, and agent journey"
+      },
+      {
+        "name": "averis_protocol_status",
+        "auth": false,
+        "description": "Live TVL, liquidity, utilization, and Hood circuit-breaker status"
+      },
+      {
+        "name": "averis_check_eligibility",
+        "auth": false,
+        "description": "Agent credit profile: limit, exposure, available credit, active jobs"
+      },
+      {
+        "name": "averis_verify_job",
+        "auth": false,
+        "description": "Verify job eligibility for financing"
+      },
+      {
+        "name": "averis_get_quote",
+        "auth": false,
+        "description": "Financing quote: approved amount, fee, repayment, expiry"
+      },
+      {
+        "name": "averis_request_funding",
+        "auth": true,
+        "description": "Returns draw() calldata for agent to submit on-chain (EIP-712 required)"
+      },
+      {
+        "name": "averis_pool_status",
+        "auth": false,
+        "description": "Pool balance, spent, recipients, expiry, freeze status"
+      },
+      {
+        "name": "averis_position_status",
+        "auth": false,
+        "description": "Full financing position state and repayment tracking"
+      },
+      {
+        "name": "averis_repay",
+        "auth": true,
+        "description": "Returns repayObligation() calldata for OBLIGATION-mode positions (EIP-712 required)."
+      },
+      {
+        "name": "passport_get",
+        "auth": false,
+        "description": "Full agent passport: identity, ERC-8004 info, policies, receipts, reputation, risk"
+      },
+      {
+        "name": "passport_policies_list",
+        "auth": false,
+        "description": "List an agent's EIP-712 policy commitments"
+      },
+      {
+        "name": "passport_receipts_list",
+        "auth": false,
+        "description": "List an agent's verified activity receipts"
+      },
+      {
+        "name": "passport_reputation",
+        "auth": false,
+        "description": "Computed reputation score and component breakdown"
+      },
+      {
+        "name": "passport_risk",
+        "auth": false,
+        "description": "Risk assessment: default rate, exposure, concentration"
+      },
+      {
+        "name": "passport_policy_commit",
+        "auth": true,
+        "description": "Commit a new EIP-712 capability policy to the passport (EIP-712 required)"
+      }
     ]
   },
-
   "operator": {
     "name": "Averis Protocol",
     "x": "https://x.com/averis_protocol",
     "github": "https://github.com/mosaro0224/averis-protocol",
     "website": "https://averisprotocol.xyz",
-    "audit_status": "unaudited — testnet only. Do not use with real funds until a third-party audit is completed.",
+    "audit_status": "unaudited \u2014 testnet only. Do not use with real funds until a third-party audit is completed.",
     "security_contact": "https://x.com/averis_protocol"
   },
-
+  "passport": {
+    "description": "Agent Economic Passport \u2014 a cross-chain, non-custodial identity and reputation layer for autonomous agents. Agents commit to capability policies on-chain (EIP-712), and verified economic activity is anchored as receipts. No funds held; identity is ERC-8004 linked.",
+    "api_base": "https://api.averisprotocol.xyz/v2/agents",
+    "chains": {
+      "rh_testnet": {
+        "chain_id": 46630,
+        "name": "Robinhood Chain Testnet",
+        "contracts": {
+          "AgentPolicyRegistry": "0xf7F47493E2f042a428a531724bE62854002979cA",
+          "AgentReceiptRegistry": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"
+        }
+      },
+      "arc_testnet": {
+        "chain_id": 5042002,
+        "name": "Arc Testnet",
+        "note": "Financingcontracts live here; Passport contracts deploy here after RH Testnet"
+      }
+    },
+    "identity_standard": "ERC-8004",
+    "identity_registry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "passport_agent_journey": [
+      {
+        "step": 1,
+        "action": "GET /v2/agents/:address/passport",
+        "description": "Full passport \u2014 identity, policies, receipts, reputation, risk"
+      },
+      {
+        "step": 2,
+        "action": "GET /v2/agents/:address/policies",
+        "description": "EIP-712 signed policy commitments and their on-chain commitment hashes"
+      },
+      {
+        "step": 3,
+        "action": "POST /v2/agents/:address/policies",
+        "description": "Commit a new capability policy (EIP-712 signed, stored offchain + optionally anchored)"
+      },
+      {
+        "step": 4,
+        "action": "GET /v2/agents/:address/receipts",
+        "description": "Verified economic activity receipts: Averis jobs, external attestations, self-reported"
+      },
+      {
+        "step": 5,
+        "action": "GET /v2/agents/:address/reputation",
+        "description": "Computed reputation score and component breakdown"
+      },
+      {
+        "step": 6,
+        "action": "GET /v2/agents/:address/risk",
+        "description": "Risk assessment: default rate, exposure, concentration metrics"
+      }
+    ],
+    "mcp_tools": [
+      {
+        "name": "passport_get",
+        "auth": false,
+        "description": "Full agent passport"
+      },
+      {
+        "name": "passport_policies_list",
+        "auth": false,
+        "description": "Agent policy commitments"
+      },
+      {
+        "name": "passport_receipts_list",
+        "auth": false,
+        "description": "Verified activity receipts"
+      },
+      {
+        "name": "passport_reputation",
+        "auth": false,
+        "description": "Reputation score"
+      },
+      {
+        "name": "passport_risk",
+        "auth": false,
+        "description": "Risk metrics"
+      },
+      {
+        "name": "passport_policy_commit",
+        "auth": true,
+        "description": "Commit a new policy"
+      }
+    ]
+  },
   "mainnet_roadmap": [
     "Third-party security audit of AverisFinancingV2, AverisJobPool, AverisHood, AverisReserve",
+    "Third-party security audit of AgentPolicyRegistry and AgentReceiptRegistry",
     "LP deposits to seed vault liquidity",
     "Gnosis Safe multisig treasury",
     "Arc Mainnet deployment",
+    "Passport contracts on Arc Mainnet",
     "Additional ERC-8183 adapter registrations for external job protocols"
-  ]
+  ],
+  "erc8004": {
+    "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "agentId": 900958,
+    "agentURI": "https://averisprotocol.xyz/.well-known/agent-card.json",
+    "registrationTx": "0x6b95f7904d7f87689cebc994c25b6c1c27341503da536ddbf702de1b9c37da1f"
+  },
+  "adapters": {
+    "whitelistedPlatforms": [
+      {
+        "name": "AverisACP",
+        "address": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+        "standard": "proprietary"
+      },
+      {
+        "name": "AgenticCommerce (ERC-8183)",
+        "address": "0x0747EEf0706327138c69792bF28Cd525089e4583",
+        "standard": "ERC-8183"
+      }
+    ]
+  },
+  "products": {
+    "finance": {
+      "description": "Job-backed working capital. Agent draws up to 40% of job budget into a controlled spending pool. 2% flat fee added at repayment. Non-recourse. Repayment automatic via ReceivableRouter lien.",
+      "chain": "Arc Testnet (5042002)",
+      "launch_url": "https://averisprotocol.xyz/app"
+    },
+    "passport": {
+      "description": "Verifiable onchain identity and reputation. ERC-8004 identity token, EIP-712 policy commitments in AgentPolicyRegistry, append-only economic receipts in AgentReceiptRegistry. Cross-chain: Arc Testnet + Robinhood Chain Testnet.",
+      "chains": [
+        "Arc Testnet (5042002)",
+        "Robinhood Chain Testnet (46630)"
+      ],
+      "launch_url": "https://averisprotocol.xyz/passport",
+      "passport_contracts": {
+        "AgentPolicyRegistry": "0xf7F47493E2f042a428a531724bE62854002979cA",
+        "AgentReceiptRegistry": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+        "chain_id": 46630
+      },
+      "erc8004_registries": {
+        "IdentityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+        "ReputationRegistry": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+        "ValidationRegistry": "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
+        "note": "CREATE2-deterministic. Same addresses on Arc Testnet and Robinhood Chain Testnet."
+      }
+    }
+  },
+  "passport_api": {
+    "endpoints": [
+      "/v2/agents/:address/passport",
+      "/v2/agents/:address/identity",
+      "/v2/agents/:address/capabilities",
+      "/v2/agents/:address/policies",
+      "/v2/agents/:address/reputation",
+      "/v2/agents/:address/risk",
+      "/v2/agents/:address/transactions",
+      "/v2/agents/:address/counterparties",
+      "/v2/agents/:address/agreements",
+      "/v2/agents/:address/receipts"
+    ]
+  }
 }

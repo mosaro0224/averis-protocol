@@ -1,9 +1,11 @@
 # Averis Protocol
-> Working capital infrastructure for autonomous AI agents.
+> Two-product onchain infrastructure for autonomous AI agents — working capital and verifiable identity.
 
-Averis Protocol provides job-backed financing to autonomous AI agents that need temporary working capital to complete active jobs. Agents draw from a controlled spending pool tied to a specific job and repay automatically when the job settles.
+Averis Protocol has two products: **Averis Finance** provides job-backed working capital to AI agents. **Averis Passport** provides verifiable onchain identity and reputation. Both are live on Arc Testnet. Both are accessible from https://averisprotocol.xyz.
 
-## What Averis Does
+---
+
+## Averis Finance
 
 An AI agent with a funded job can:
 1. Apply for a temporary credit facility against the job receivable
@@ -11,7 +13,7 @@ An AI agent with a funded job can:
 3. Spend from the pool to complete the job
 4. Repay automatically when the job payout settles through Averis's ReceivableRouter
 
-## Key Terms (Arc Testnet — no real-world value)
+### Finance Terms (Arc Testnet)
 
 - Advance rate: 40% of job budget
 - Financing fee: 2% flat fee on the advance
@@ -19,78 +21,25 @@ An AI agent with a funded job can:
 - Protocol maximum: 50,000 USDC
 - Fee split: 70% to liquidity providers, 20% to treasury, 10% to reserve
 - Repayment: automatic via ReceivableRouter lien on job payout
-- Default: non-recourse — no personal liability, no on-chain blacklist. Unspent pool capital returned to vault automatically. Net loss written off against vault NAV. Repeated defaults may result in protocol owner reducing agent credit limit.
+- Default: non-recourse — no personal liability, no on-chain blacklist
 
-## Example
+### Example
 
 Job budget: $1,000 USDC
-Maximum advance: $400 (40% of budget, subject to agent credit limit, protocol maximum, and available vault liquidity — minimum of all four)
-Financing fee: $8 (2% of $400, added at repayment — NOT deducted at draw)
-Agent draws 400 and receives 400 in the controlled spending pool.
-At settlement: Averis receives $408 (principal $400 + fee $8), agent receives $592 plus any unspent pool balance.
-Total agent cost: $8 USDC.
+Maximum advance: $400 (40% of budget)
+Financing fee: $8 (2% of $400, added at repayment)
+Agent draws 400 → receives 400 in controlled spending pool → repays 408 at settlement → keeps 592 plus unspent pool balance.
 
-## Eligibility
+### Finance Eligibility
 
 - Agent must have a funded, active job
 - Job must not be expired
 - Agent must be the job provider
 - Job payout receiver must be set to Averis ReceivableRouter before funding
 - No existing financing position on the same job
-- Requested amount must be within advance rate cap and agent credit limit
+- Requested amount within advance rate cap and agent credit limit
 
-## Default Consequences
-
-If a job fails, is rejected, or expires:
-- Any unspent pool capital is swept back to the vault automatically (balance-diff sweep)
-- The net loss (amount actually spent by agent) is written off against the vault NAV
-- The agent's credit exposure is released
-- Non-recourse: no personal liability and no on-chain blacklist or reputation penalty
-- The protocol owner may reduce the agent's credit limit after repeated defaults. This is an off-chain governance action, not an automatic on-chain penalty.
-- Note: protocol terms (advance rate, fee, caps) are owner-adjustable on-chain at any time
-
-## Network
-
-Currently live on Arc Testnet (chain ID 5042002). USDC on this network has no real-world value.
-Mainnet deployment is on the roadmap pending audit and liquidity.
-
-## Integration
-
-Agents can integrate via:
-- REST API: https://api.averisprotocol.xyz
-- MCP endpoint: https://api.averisprotocol.xyz/v1/mcp
-- Agent card: https://api.averisprotocol.xyz/.well-known/agent-card.json
-- Discovery: https://api.averisprotocol.xyz/v1/discover
-- OpenAPI: https://api.averisprotocol.xyz/openapi.json
-- Plain text summary: https://api.averisprotocol.xyz/v1/summary
-
-## Agent Journey
-
-1. GET /.well-known/agent-card.json — discover Averis
-2. GET /v1/discover — read full capability manifest
-3. GET /v1/agents/{address}/eligibility — check credit profile and available limit
-4. POST /v2/jobs/verify — confirm job is funded, active, and lien is correctly established
-5. POST /v2/credit/quote — get financing terms: approved amount, fee, total repayment, terms_hash, quoted_at_block
-   Response includes terms_hash (keccak256 of advanceRateBps + feeBps + protocolMaximum at quote time)
-   and expires_at_block (~5 minutes). Verify terms_hash is unchanged before signing draw().
-6. Submit draw() on-chain — create controlled spending pool
-7. GET /v2/pools/:poolAddress — monitor pool balance, recipients, and expiry
-8. Call pool.spend(recipient, amount) — spend to approved recipients
-9. GET /v2/positions/:jobId — track financing position and repayment status
-10. Job settles — repayment automatic via ReceivableRouter (LIEN mode) or call repayObligation() (OBLIGATION mode)
-
-## Authentication
-
-Mutating API requests require EIP-712 signature over AgentRequest:
-- Domain: { name: "AverisProtocol", version: "2", chainId: 5042002 }
-- PrimaryType: AgentRequest
-- Types: { AgentRequest: [{ name: "agentAddress", type: "address" }, { name: "nonce", type: "uint256" }, { name: "expiry", type: "uint256" }, { name: "chainId", type: "uint256" }] }
-- Header: X-Agent-Signature: {eip712-signature-hex}
-- Fields: agentAddress, nonce (per-agent monotonic), expiry (unix timestamp), chainId — no jobId in the signature
-
-## Contracts (Arc Testnet)
-
-For the always-current address table query GET /v1/discover.
+### Finance Contracts (Arc Testnet — chain ID 5042002)
 
 - AverisVault:           0xf7F47493E2f042a428a531724bE62854002979cA
 - AverisFinancingV2:     0x102eC41EDdeed916012D7B345c42e7Be64AD2051
@@ -104,6 +53,73 @@ For the always-current address table query GET /v1/discover.
 - AverisACPAdapter:      0x8753aE3c8fACf0C352c4b786AF44D8eBF383D62A
 - ExternalJobAdapter:    0xbd07EBa80Bf4b6F6999A6951Af05beC11BC833bb
 
+---
+
+## Averis Passport
+
+The Agent Economic Passport is a non-custodial, cross-chain identity and reputation layer for autonomous agents. It is NOT a financing product — it is an identity and track-record layer that any agent, platform, or observer can read independently.
+
+### What Passport Does
+
+- **ERC-8004 Identity:** Every agent mints an identity token on Arc Testnet or Robinhood Chain Testnet. Non-transferable. Links all activity to one verifiable wallet. mint(wallet, agentId, metadataURI) on IdentityRegistry.
+- **Policy Commitments (AgentPolicyRegistry):** Agents commit to capability policies using EIP-712 signatures. Policies are versioned, revocable, and domain-separated from financing. No funds held.
+- **Economic Receipts (AgentReceiptRegistry):** Append-only registry of verified economic activity. Three verification states: SELF_REPORTED, AVERIS_VERIFIED, EXTERNAL_ATTESTER. Receipts reference work by IPFS hash.
+- **Cross-chain Reputation:** Same identity and receipt record readable on Arc Testnet and Robinhood Chain Testnet. CREATE2-deterministic registry addresses — same address on both chains.
+
+### Passport Contracts
+
+- AgentPolicyRegistry:    0xf7F47493E2f042a428a531724bE62854002979cA  (Robinhood Chain Testnet, 46630)
+- AgentReceiptRegistry:   0x3477e203fCFFbfe0E419E230d115d7C80A22BB18  (Robinhood Chain Testnet, 46630)
+- IdentityRegistry:       0x8004A818BFB912233c491871b3d84c89A494BD9e  (Arc Testnet + RH Testnet)
+- ReputationRegistry:     0x8004B663056A597Dffe9eCcC1965A193B7388713  (Arc Testnet + RH Testnet)
+- ValidationRegistry:     0x8004Cb1BF31DAf7788923b405b754f57acEB4272  (Arc Testnet + RH Testnet)
+
+### Passport API Endpoints
+
+- GET /v2/agents/:address/passport         — full passport summary
+- GET /v2/agents/:address/identity         — ERC-8004 identity across chains
+- GET /v2/agents/:address/capabilities     — declared capabilities
+- GET /v2/agents/:address/policies         — policy commitments
+- GET /v2/agents/:address/reputation       — reputation score and tier
+- GET /v2/agents/:address/risk             — risk profile and signals
+- GET /v2/agents/:address/transactions     — transaction history
+- GET /v2/agents/:address/counterparties   — counterparty graph
+- GET /v2/agents/:address/agreements       — active agreements
+- GET /v2/agents/:address/receipts         — verified receipts
+
+---
+
+## Full API Reference
+
+Base URL: https://api.averisprotocol.xyz
+
+### Finance Endpoints
+
+- GET  /v1/discover                          — full capability manifest (start here)
+- GET  /v1/agents/{address}/eligibility      — credit profile for agent address
+- POST /v2/credit/quote                      — financing quote with terms_hash
+- GET  /v2/pools/{poolAddress}               — spending pool state
+- POST /v2/pools/{poolAddress}/spend         — validated spend calldata (agent submits on-chain)
+- GET  /v2/positions/{jobId}                 — position lifecycle tracking
+- POST /v1/mcp                               — MCP/1.0 tool interface (9 tools)
+
+### Discovery Endpoints
+
+- GET  /.well-known/agent-card.json          — A2A agent capability card (Finance + Passport)
+- GET  /llms.txt                             — this file
+- GET  /openapi.json                         — OpenAPI 3.1 spec
+- GET  /v1/summary                           — plain text summary for LLM context
+
+### Authentication
+
+Read-only endpoints need no auth. Mutating calls require EIP-712 AgentRequest signature:
+- Domain: { name: "AverisProtocol", version: "2", chainId: 5042002 }
+- PrimaryType: AgentRequest
+- Types: { AgentRequest: [agentAddress (address), nonce (uint256), expiry (uint256), chainId (uint256)] }
+- Header: X-Agent-Signature: {eip712-signature-hex}
+
+---
+
 ## ERC-8004 Onchain Identity
 
 Averis is registered in the Arc ERC-8004 IdentityRegistry.
@@ -113,121 +129,50 @@ Averis is registered in the Arc ERC-8004 IdentityRegistry.
 - agentURI:          https://averisprotocol.xyz/.well-known/agent-card.json
 - Owner:             0x4bAf1e5E3355f37539f423Ba251Dd7f98fE2Ea56
 
-## Whitelisted External Platforms (ExternalJobAdapter)
-
-External job platforms whitelisted for financing via adapterId=1:
-
-- AverisACP (proprietary):              0x3477e203fCFFbfe0E419E230d115d7C80A22BB18
-- AgenticCommerce ERC-8183 (official):  0x0747EEf0706327138c69792bF28Cd525089e4583
-
-## External Job Financing
-
-Averis can also finance jobs that live on external platforms not natively routed through Averis contracts.
-
-How it works:
-- The ExternalJobAdapter is registered in AverisAdapterRegistry (adapterId=1)
-- It reads job state directly from any whitelisted external platform contract via IExternalJob interface
-- If the external platform supports setPayoutReceiver, LIEN mode is used (automatic repayment)
-- If not, OBLIGATION mode activates — the agent signs an EIP-712 RepaymentObligation at draw time and calls repayObligation() after settlement
-- External platforms must be whitelisted by the protocol owner via setPlatform()
-- Same eligibility rules apply: job must be funded, active, agent must be provider, amount within caps
-
-Agent flow for external jobs:
-1. GET /v1/discover — confirm ExternalJobAdapter is listed in contracts
-2. GET /v1/agents/{address}/eligibility — check credit profile
-3. POST /v2/credit/quote with { platformAddress, jobId } — get terms
-4. Submit draw() on-chain with adapterId=1 and { platformAddress, jobId }
-5. Pool created — spend, settle, repay same as native flow
+---
 
 ## How Agents Discover Averis Autonomously
 
-Agent frameworks can wire up Averis discovery without human intervention via three paths:
-
 **Path 1 — Well-known URL (simplest):**
-Any agent that scans `https://averisprotocol.xyz/.well-known/agent-card.json` at startup
-will find the full capability manifest, contract addresses, and financing terms.
-Standard A2A discovery pattern — works with any HTTP-capable agent.
+GET https://averisprotocol.xyz/.well-known/agent-card.json
+Full capability manifest, contract addresses, financing terms, and passport endpoints.
 
 **Path 2 — ERC-8004 onchain registry (trustless):**
-Query the Arc Testnet IdentityRegistry at `0x8004A818BFB912233c491871b3d84c89A494BD9e`.
-Call `tokenURI(900958)` to resolve Averis's agentURI without any off-chain dependency.
-Example (viem): `readContract({ address: '0x8004...', abi: [...], functionName: 'tokenURI', args: [900958n] })`
+Query IdentityRegistry at 0x8004A818BFB912233c491871b3d84c89A494BD9e on Arc Testnet.
+Call tokenURI(900958) to resolve Averis's agentURI without any off-chain dependency.
 
 **Path 3 — Direct API bootstrap:**
-Seed your agent with one URL: `https://api.averisprotocol.xyz/v1/discover`
-The response is self-describing — capabilities, contracts, terms, and the full agent journey
-are all included. No schema doc needed.
+GET https://api.averisprotocol.xyz/v1/discover
+Self-describing — capabilities, contracts, terms, passport endpoints, and the full agent journey all included.
 
-**Important — spending pool clarification:**
-`POST /v2/pools/:poolAddress/spend` returns **unsigned calldata** — the API does NOT
-execute the spend. The agent must take the returned `calldata` and submit it on-chain
-from its own wallet. The API validates the spend request (recipient whitelist, per-tx limit,
-pool expiry) before returning calldata. Direct contract calls to `AverisJobPool.spend()`
-also work without going through the API.
+**Path 4 — LLM/crawler entry point:**
+GET https://averisprotocol.xyz/llms.txt
+This file. Full protocol description including both Finance and Passport products.
 
-## Agent Economic Passport
+---
 
-Averis includes a non-custodial, cross-chain identity and reputation layer for autonomous agents called the Agent Economic Passport.
+## Spending Pool Clarification
 
-### What It Is
+POST /v2/pools/:poolAddress/spend returns unsigned calldata — the API does NOT execute the spend.
+The agent must take the returned calldata and submit it on-chain from its own wallet.
+The API validates the spend request (recipient whitelist, per-tx limit, pool expiry) before returning calldata.
+Direct contract calls to AverisJobPool.spend() also work without going through the API.
 
-The Passport is NOT a financing product. It is an identity and track-record layer:
-- **AgentPolicyRegistry** (Robinhood Chain Testnet, chain 46630): agents commit to capability policies using EIP-712 signatures. Policies are versioned, revocable, and non-transferable. No funds are held. Policy hashes are stored onchain as commitments.
-- **AgentReceiptRegistry** (Robinhood Chain Testnet, chain 46630): append-only registry of verified economic activity. Three verification states: SELF_REPORTED, AVERIS_VERIFIED, EXTERNAL_ATTESTER. Receipts reference completed work by IPFS hash — no raw data onchain.
-- **Identity**: linked to ERC-8004 `IdentityRegistry` at `0x8004A818BFB912233c491871b3d84c89A494BD9e` on each chain.
+---
 
-### Passport API
+## External Job Financing
 
-Base: `https://api.averisprotocol.xyz/v2/agents/:address`
+Averis can finance jobs on external platforms not natively routed through Averis contracts.
+The ExternalJobAdapter is registered in AverisAdapterRegistry (adapterId=1).
+If the external platform supports setPayoutReceiver, LIEN mode is used (automatic repayment).
+If not, OBLIGATION mode activates — agent signs EIP-712 RepaymentObligation at draw time.
+Whitelisted platforms: AverisACP (0x3477e203fCFFbfe0E419E230d115d7C80A22BB18), AgenticCommerce ERC-8183 (0x0747EEf0706327138c69792bF28Cd525089e4583).
 
-| Endpoint | Auth | Description |
-|---|---|---|
-| GET /v2/agents/:address/passport | No | Full passport |
-| GET /v2/agents/:address/policies | No | Policy commitments |
-| POST /v2/agents/:address/policies | EIP-712 | Commit a new policy |
-| GET /v2/agents/:address/receipts | No | Verified receipts |
-| GET /v2/agents/:address/reputation | No | Computed score |
-| GET /v2/agents/:address/risk | No | Risk metrics |
-| GET /v2/agents/:address/identity | No | ERC-8004 identity |
-| GET /v2/agents/:address/agreements | No | Agreement history |
-| GET /v2/agents/:address/chains | No | Cross-chain profile |
-| GET /v2/agents/:address/counterparties | No | Counterparty relationships |
-| GET /v2/agents/:address/transactions | No | Transaction history |
-| GET /v2/agents/:address/capabilities | No | Declared capabilities |
-| GET /v2/agents/:address/authorization | No | Authorization status |
+---
 
-### Passport MCP Tools
+## Network
 
-MCP endpoint `https://api.averisprotocol.xyz/v1/mcp` exposes these Passport tools:
-- `passport_get` — full passport
-- `passport_policies_list` — policy commitments
-- `passport_receipts_list` — verified receipts
-- `passport_reputation` — reputation score
-- `passport_risk` — risk metrics
-- `passport_policy_commit` — commit a new policy (EIP-712 required)
-
-### Important Notes
-
-- No USDC or funds are held by Passport contracts — non-custodial.
-- Policy commitments are EIP-712 signed — the server verifies the signature before storing.
-- Reputation and risk scores are computed from on-chain Averis financing history and anchored receipts — no fabricated data.
-- Passport contracts are deployed on Robinhood Chain Testnet (chain 46630); Averis financing contracts remain on Arc Testnet (chain 5042002).
-- Contracts pending final address confirmation after RH Testnet faucet funding.
-
-## Keywords
-
-agent working capital, agent financing, AI agent funding, USDC financing,
-job-backed credit, receivable financing, agentic finance, agent liquidity,
-ERC-8183 financing, autonomous agent economy, on-chain working capital,
-temporary capital pool, spending pool, agent credit facility,
-external job financing, bridge job financing, cross-platform agent financing,
-agent passport, agent identity, agent reputation, agent policy, ERC-8004,
-agent economic passport, cross-chain agent identity, autonomous agent reputation
-
-## Links
-
-- Website: https://averisprotocol.xyz
-- API: https://api.averisprotocol.xyz
-- GitHub: https://github.com/mosaro0224/averis-protocol
-- X: https://x.com/averis_protocol
-- Audit status: Unaudited — testnet only. Do not use with real funds.
+Finance: Arc Testnet (chain ID 5042002). USDC: 0x3600000000000000000000000000000000000000
+Passport contracts: Robinhood Chain Testnet (chain ID 46630).
+ERC-8004 registries: Arc Testnet + Robinhood Chain Testnet (same CREATE2 address on both).
+Mainnet deployment on roadmap pending audit and liquidity.

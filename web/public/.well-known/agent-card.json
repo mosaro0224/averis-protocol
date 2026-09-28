@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "name": "Averis Protocol",
-  "description": "On-chain working-capital infrastructure for autonomous AI agents. Averis finances verified jobs \u2014 an agent with an active, funded job can request a temporary controlled spending pool to bridge a capital shortfall and complete the job. Principal and fees are repaid automatically from the job receivable.",
+  "description": "Two-product onchain infrastructure for autonomous AI agents. Averis Finance provides job-backed working capital \u2014 an agent with a funded job draws a controlled spending pool and repays automatically from the job receivable. Averis Passport provides verifiable onchain identity and reputation \u2014 ERC-8004 identity tokens, EIP-712 policy commitments, and an append-only receipt registry, readable cross-chain.",
   "url": "https://averisprotocol.xyz",
   "status": "testnet",
   "network_note": "Currently live on Arc Testnet (chain 5042002). Mainnet deployment is on the roadmap. USDC on this network has no real-world value.",
@@ -24,7 +24,14 @@
     "job_backed_credit",
     "controlled_spending_pool",
     "receivable_financing",
-    "external_job_financing"
+    "external_job_financing",
+    "agent_identity",
+    "agent_reputation",
+    "erc8004_identity",
+    "policy_commitments",
+    "economic_receipts",
+    "cross_chain_reputation",
+    "agent_passport"
   ],
   "keywords": [
     "agent working capital",
@@ -41,7 +48,16 @@
     "spending pool",
     "receivable financing",
     "on-chain working capital",
-    "agent liquidity provider"
+    "agent liquidity provider",
+    "agent identity",
+    "agent reputation",
+    "ERC-8004",
+    "policy registry",
+    "receipt registry",
+    "agent passport",
+    "cross-chain identity",
+    "onchain reputation",
+    "verifiable agent identity"
   ],
   "protocol_terms": {
     "note": "Live values read from AverisFinancingV2 on Arc Testnet. These are the actual on-chain parameters.",
@@ -316,14 +332,14 @@
     "security_contact": "https://x.com/averis_protocol"
   },
   "passport": {
-    "description": "Agent Economic Passport — a cross-chain, non-custodial identity and reputation layer for autonomous agents. Agents commit to capability policies on-chain (EIP-712), and verified economic activity is anchored as receipts. No funds held; identity is ERC-8004 linked.",
+    "description": "Agent Economic Passport \u2014 a cross-chain, non-custodial identity and reputation layer for autonomous agents. Agents commit to capability policies on-chain (EIP-712), and verified economic activity is anchored as receipts. No funds held; identity is ERC-8004 linked.",
     "api_base": "https://api.averisprotocol.xyz/v2/agents",
     "chains": {
       "rh_testnet": {
         "chain_id": 46630,
         "name": "Robinhood Chain Testnet",
         "contracts": {
-          "AgentPolicyRegistry":  "0xf7F47493E2f042a428a531724bE62854002979cA",
+          "AgentPolicyRegistry": "0xf7F47493E2f042a428a531724bE62854002979cA",
           "AgentReceiptRegistry": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"
         }
       },
@@ -336,20 +352,68 @@
     "identity_standard": "ERC-8004",
     "identity_registry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
     "passport_agent_journey": [
-      { "step": 1, "action": "GET /v2/agents/:address/passport", "description": "Full passport — identity, policies, receipts, reputation, risk" },
-      { "step": 2, "action": "GET /v2/agents/:address/policies", "description": "EIP-712 signed policy commitments and their on-chain commitment hashes" },
-      { "step": 3, "action": "POST /v2/agents/:address/policies", "description": "Commit a new capability policy (EIP-712 signed, stored offchain + optionally anchored)" },
-      { "step": 4, "action": "GET /v2/agents/:address/receipts", "description": "Verified economic activity receipts: Averis jobs, external attestations, self-reported" },
-      { "step": 5, "action": "GET /v2/agents/:address/reputation", "description": "Computed reputation score and component breakdown" },
-      { "step": 6, "action": "GET /v2/agents/:address/risk", "description": "Risk assessment: default rate, exposure, concentration metrics" }
+      {
+        "step": 1,
+        "action": "GET /v2/agents/:address/passport",
+        "description": "Full passport \u2014 identity, policies, receipts, reputation, risk"
+      },
+      {
+        "step": 2,
+        "action": "GET /v2/agents/:address/policies",
+        "description": "EIP-712 signed policy commitments and their on-chain commitment hashes"
+      },
+      {
+        "step": 3,
+        "action": "POST /v2/agents/:address/policies",
+        "description": "Commit a new capability policy (EIP-712 signed, stored offchain + optionally anchored)"
+      },
+      {
+        "step": 4,
+        "action": "GET /v2/agents/:address/receipts",
+        "description": "Verified economic activity receipts: Averis jobs, external attestations, self-reported"
+      },
+      {
+        "step": 5,
+        "action": "GET /v2/agents/:address/reputation",
+        "description": "Computed reputation score and component breakdown"
+      },
+      {
+        "step": 6,
+        "action": "GET /v2/agents/:address/risk",
+        "description": "Risk assessment: default rate, exposure, concentration metrics"
+      }
     ],
     "mcp_tools": [
-      { "name": "passport_get", "auth": false, "description": "Full agent passport" },
-      { "name": "passport_policies_list", "auth": false, "description": "Agent policy commitments" },
-      { "name": "passport_receipts_list", "auth": false, "description": "Verified activity receipts" },
-      { "name": "passport_reputation", "auth": false, "description": "Reputation score" },
-      { "name": "passport_risk", "auth": false, "description": "Risk metrics" },
-      { "name": "passport_policy_commit", "auth": true, "description": "Commit a new policy" }
+      {
+        "name": "passport_get",
+        "auth": false,
+        "description": "Full agent passport"
+      },
+      {
+        "name": "passport_policies_list",
+        "auth": false,
+        "description": "Agent policy commitments"
+      },
+      {
+        "name": "passport_receipts_list",
+        "auth": false,
+        "description": "Verified activity receipts"
+      },
+      {
+        "name": "passport_reputation",
+        "auth": false,
+        "description": "Reputation score"
+      },
+      {
+        "name": "passport_risk",
+        "auth": false,
+        "description": "Risk metrics"
+      },
+      {
+        "name": "passport_policy_commit",
+        "auth": true,
+        "description": "Commit a new policy"
+      }
     ]
   },
   "mainnet_roadmap": [
@@ -379,6 +443,46 @@
         "address": "0x0747EEf0706327138c69792bF28Cd525089e4583",
         "standard": "ERC-8183"
       }
+    ]
+  },
+  "products": {
+    "finance": {
+      "description": "Job-backed working capital. Agent draws up to 40% of job budget into a controlled spending pool. 2% flat fee added at repayment. Non-recourse. Repayment automatic via ReceivableRouter lien.",
+      "chain": "Arc Testnet (5042002)",
+      "launch_url": "https://averisprotocol.xyz/app"
+    },
+    "passport": {
+      "description": "Verifiable onchain identity and reputation. ERC-8004 identity token, EIP-712 policy commitments in AgentPolicyRegistry, append-only economic receipts in AgentReceiptRegistry. Cross-chain: Arc Testnet + Robinhood Chain Testnet.",
+      "chains": [
+        "Arc Testnet (5042002)",
+        "Robinhood Chain Testnet (46630)"
+      ],
+      "launch_url": "https://averisprotocol.xyz/passport",
+      "passport_contracts": {
+        "AgentPolicyRegistry": "0xf7F47493E2f042a428a531724bE62854002979cA",
+        "AgentReceiptRegistry": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+        "chain_id": 46630
+      },
+      "erc8004_registries": {
+        "IdentityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+        "ReputationRegistry": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+        "ValidationRegistry": "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
+        "note": "CREATE2-deterministic. Same addresses on Arc Testnet and Robinhood Chain Testnet."
+      }
+    }
+  },
+  "passport_api": {
+    "endpoints": [
+      "/v2/agents/:address/passport",
+      "/v2/agents/:address/identity",
+      "/v2/agents/:address/capabilities",
+      "/v2/agents/:address/policies",
+      "/v2/agents/:address/reputation",
+      "/v2/agents/:address/risk",
+      "/v2/agents/:address/transactions",
+      "/v2/agents/:address/counterparties",
+      "/v2/agents/:address/agreements",
+      "/v2/agents/:address/receipts"
     ]
   }
 }
