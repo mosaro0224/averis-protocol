@@ -139,17 +139,12 @@ export async function getPolicies(wallet) {
 
   try {
     const client = getRhClient();
-    let policyIds;
-    try {
-      policyIds = await client.readContract({
-        address: policyRegistry,
-        abi: POLICY_REGISTRY_ABI,
-        functionName: "getAgentPolicies",
-        args: [wallet],
-      });
-    } catch {
-      return { policies: [], nonce: 0, note: "Policy registry not yet deployed or unreachable on Robinhood Chain Testnet" };
-    }
+    const policyIds = await client.readContract({
+      address: policyRegistry,
+      abi: POLICY_REGISTRY_ABI,
+      functionName: "getAgentPolicies",
+      args: [wallet],
+    });
     const nonce = await client.readContract({
       address: policyRegistry,
       abi: POLICY_REGISTRY_ABI,
@@ -183,7 +178,7 @@ export async function getPolicies(wallet) {
 
     return { policies, nonce: Number(nonce) };
   } catch (err) {
-    return { policies: [], nonce: 0, error: err.message };
+    return { policies: [], nonce: 0, error: err.message, registry: process.env.PASSPORT_POLICY_REGISTRY || 'not set' };
   }
 }
 
