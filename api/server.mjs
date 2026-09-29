@@ -1260,6 +1260,247 @@ app.post("/v2/agents/:address/identity/link", (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Passport action endpoints (Option A — unsigned calldata, agent signs + submits) ──
+
+const ERC8004_IDENTITY_REGISTRY = "0x8004A818BFB912233c491871b3d84c89A494BD9e";
+const PASSPORT_POLICY_REGISTRY  = process.env.PASSPORT_POLICY_REGISTRY  || "0xf7F47493E2f042a428a531724bE62854002979cA";
+const PASSPORT_RECEIPT_REGISTRY = process.env.PASSPORT_RECEIPT_REGISTRY || "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18";
+
+const RH_RPC_URL = process.env.RH_TESTNET_RPC || "https://rpc.testnet.chain.robinhood.com";
+const RH_CHAIN_OBJ = {
+  id: 46630,
+  name: "Robinhood Chain Testnet",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: [RH_RPC_URL] } },
+};
+let _rhPassportClient = null;
+function getRhPassportClient() {
+  if (!_rhPassportClient) _rhPassportClient = createPublicClient({ chain: RH_CHAIN_OBJ, transport: http(RH_RPC_URL) });
+  return _rhPassportClient;
+}
+
+const IDENTITY_MINT_ABI = parseAbi([
+  "function mint(address wallet, uint256 agentId, string metadataURI) external returns (uint256)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function totalSupply() view returns (uint256)",
+]);
+
+const POLICY_COMMIT_ABI = parseAbi([
+  "function commitPolicy(address agentWallet, uint256 agentId, address identityRegistry, bytes32 policyHash, bytes32 contentURIHash, uint64 expiresAt) external returns (uint256)",
+  "function nonces(address agentWallet) view returns (uint256)",
+]);
+
+// POST /v2/passport/identity/prepare-mint
+// Returns unsigned calldata for mint(wallet, agentId, metadataURI) on the IdentityRegistry.
+// Agent signs and broadcasts. Supports chainId 5042002 (Arc) and 46630 (RH Testnet).
+app.post("/v2/passport/identity/prepare-mint", async (req, res) => {
+  const { wallet, agentId, metadataURI, chainId = 5042002 } = req.body;
+
+  if (!wallet || agentId === undefined || !metadataURI) {
+    return res.status(400).json({ error: "wallet, agentId, and metadataURI are required" });
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) {
+    return res.status(400).json({ error: "wallet must be a valid 0x address" });
+  }
+  if (isNaN(Number(agentId)) || Number(agentId) < 0) {
+    return res.status(400).json({ error: "agentId must be a non-negative integer" });
+  }
+  if (![5042002, 46630].includes(Number(chainId))) {
+    return res.status(400).json({ error: "chainId must be 5042002 (Arc Testnet) or 46630 (Robinhood Chain Testnet)" });
+  }
+
+  try {
+    // Check agentId is not already minted
+    const client = Number(chainId) === 46630 ? getRhPassportClient() : publicClient;
+    let alreadyMinted = false;
+    try {
+      await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: IDENTITY_MINT_ABI, functionName: "ownerOf", args: [BigInt(agentId)] });
+      alreadyMinted = true;
+    } catch { /* ownerOf reverts if token does not exist */ }
+
+    if (alreadyMinted) {
+      return res.status(409).json({ error: `agentId ${agentId} is already minted on chain ${chainId}` });
+    }
+
+    // Encode calldata
+    const { encodeFunctionData } = await import("viem");
+    const calldata = encodeFunctionData({
+      abi: IDENTITY_MINT_ABI,
+      functionName: "mint",
+      args: [wallet, BigInt(agentId), metadataURI],
+    });
+
+    const chainName = Number(chainId) === 46630 ? "Robinhood Chain Testnet" : "Arc Testnet";
+    const explorer  = Number(chainId) === 46630
+      ? "https://explorer.testnet.chain.robinhood.com"
+      : "https://explorer.testnet.arc.io";
+
+    return res.json({
+      action: "mint_identity",
+      instructions: "Sign and broadcast this transaction from the wallet address. The wallet will become the owner of the identity token.",
+      transaction: {
+        to:       ERC8004_IDENTITY_REGISTRY,
+        data:     calldata,
+        value:    "0x0",
+        chainId:  Number(chainId),
+      },
+      params: { wallet, agentId: Number(agentId), metadataURI, chainId: Number(chainId) },
+      chain: { id: Number(chainId), name: chainName, explorer },
+      registryAddress: ERC8004_IDENTITY_REGISTRY,
+      note: "No gas fee in USDC is required beyond the network transaction fee. On Arc Testnet, gas is paid in USDC.",
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to prepare mint calldata", detail: err.message });
+  }
+});
+
+// POST /v2/passport/identity/verify
+// Resolves the onchain identity for a wallet across Arc Testnet and Robinhood Chain Testnet.
+// Returns verified identity records, chain coverage, and passport store links.
+app.post("/v2/passport/identity/verify", async (req, res) => {
+  const { wallet, agentId, chainId } = req.body;
+
+  if (!wallet && agentId === undefined) {
+    return res.status(400).json({ error: "wallet or agentId is required" });
+  }
+
+  const OWNER_ABI = parseAbi([
+    "function ownerOf(uint256 tokenId) view returns (address)",
+    "function tokenURI(uint256 tokenId) view returns (string)",
+    "function totalSupply() view returns (uint256)",
+  ]);
+
+  const chains = chainId
+    ? [Number(chainId)]
+    : [5042002, 46630];
+
+  const results = await Promise.all(chains.map(async (cid) => {
+    const client = cid === 46630 ? getRhPassportClient() : publicClient;
+    const chainName = cid === 46630 ? "Robinhood Chain Testnet" : "Arc Testnet";
+    const caip2 = `eip155:${cid}`;
+
+    try {
+      if (agentId !== undefined) {
+        // Resolve by agentId
+        const [owner, uri] = await Promise.all([
+          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "ownerOf", args: [BigInt(agentId)] }),
+          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "tokenURI", args: [BigInt(agentId)] }),
+        ]);
+        const matches = wallet ? owner.toLowerCase() === wallet.toLowerCase() : true;
+        return { chainId: cid, chainName, caip2, agentId: Number(agentId), wallet: owner, metadataURI: uri, verified: true, walletMatches: matches };
+      } else {
+        // Scan by wallet — check if any token is owned by this wallet
+        // Best effort: try agentIds from store first, then report unresolved if none
+        const stored = passportStore.getIdentityLinks(wallet);
+        const link = stored?.find(l => l.caip2 === caip2);
+        if (link) {
+          const [owner, uri] = await Promise.all([
+            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "ownerOf", args: [BigInt(link.agentId)] }),
+            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "tokenURI", args: [BigInt(link.agentId)] }),
+          ]);
+          const matches = owner.toLowerCase() === wallet.toLowerCase();
+          return { chainId: cid, chainName, caip2, agentId: link.agentId, wallet: owner, metadataURI: uri, verified: matches, walletMatches: matches };
+        }
+        return { chainId: cid, chainName, caip2, verified: false, reason: "No identity found for this wallet on this chain. Mint via POST /v2/passport/identity/prepare-mint" };
+      }
+    } catch {
+      return { chainId: cid, chainName, caip2, verified: false, reason: "No identity registered on this chain" };
+    }
+  }));
+
+  const verifiedChains = results.filter(r => r.verified).map(r => r.caip2);
+  return res.json({
+    wallet:         wallet || null,
+    agentId:        agentId !== undefined ? Number(agentId) : null,
+    verified:       verifiedChains.length > 0,
+    verifiedChains,
+    chainsChecked:  chains.map(c => `eip155:${c}`),
+    identities:     results,
+    registryAddress: ERC8004_IDENTITY_REGISTRY,
+    registryNote:   "Same contract address on Arc Testnet and Robinhood Chain Testnet (CREATE2 deterministic)",
+    mintEndpoint:   "POST /v2/passport/identity/prepare-mint",
+  });
+});
+
+// POST /v2/passport/policy/prepare-commit
+// Returns unsigned calldata for commitPolicy() on AgentPolicyRegistry (RH Testnet).
+// Also returns the EIP-712 struct the agent should sign as proof of intent.
+// Agent encodes the tx, signs it with their wallet, and broadcasts to RH Testnet.
+app.post("/v2/passport/policy/prepare-commit", async (req, res) => {
+  const { wallet, agentId, policyHash, contentURIHash, expiresAt = 0 } = req.body;
+
+  if (!wallet || agentId === undefined || !policyHash) {
+    return res.status(400).json({ error: "wallet, agentId, and policyHash are required" });
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) {
+    return res.status(400).json({ error: "wallet must be a valid 0x address" });
+  }
+  if (!/^0x[0-9a-fA-F]{64}$/.test(policyHash)) {
+    return res.status(400).json({ error: "policyHash must be a 32-byte hex string (0x + 64 hex chars)" });
+  }
+  const contentHash = contentURIHash && /^0x[0-9a-fA-F]{64}$/.test(contentURIHash)
+    ? contentURIHash
+    : "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+  try {
+    // Read current nonce from PolicyRegistry on RH Testnet
+    let nonce = 0;
+    try {
+      nonce = Number(await getRhPassportClient().readContract({
+        address: PASSPORT_POLICY_REGISTRY,
+        abi: POLICY_COMMIT_ABI,
+        functionName: "nonces",
+        args: [wallet],
+      }));
+    } catch { /* registry may not have this wallet yet — nonce 0 */ }
+
+    const { encodeFunctionData } = await import("viem");
+    const calldata = encodeFunctionData({
+      abi: POLICY_COMMIT_ABI,
+      functionName: "commitPolicy",
+      args: [
+        wallet,
+        BigInt(agentId),
+        ERC8004_IDENTITY_REGISTRY,
+        policyHash,
+        contentHash,
+        BigInt(expiresAt),
+      ],
+    });
+
+    return res.json({
+      action: "commit_policy",
+      instructions: "Sign and broadcast this transaction from the agent wallet to Robinhood Chain Testnet (chain 46630). Policy commitments are irreversible once confirmed.",
+      transaction: {
+        to:      PASSPORT_POLICY_REGISTRY,
+        data:    calldata,
+        value:   "0x0",
+        chainId: 46630,
+      },
+      params: {
+        wallet,
+        agentId:        Number(agentId),
+        identityRegistry: ERC8004_IDENTITY_REGISTRY,
+        policyHash,
+        contentURIHash: contentHash,
+        expiresAt:      Number(expiresAt),
+        currentNonce:   nonce,
+      },
+      chain: {
+        id:       46630,
+        name:     "Robinhood Chain Testnet",
+        rpc:      RH_RPC_URL,
+        explorer: "https://explorer.testnet.chain.robinhood.com",
+      },
+      registryAddress: PASSPORT_POLICY_REGISTRY,
+      eip712_note: "policyHash should be keccak256 of the policy document. contentURIHash should be keccak256 of the IPFS URI pointing to the full policy content. Both are stored onchain as commitments — raw content is never stored onchain.",
+      revocation_note: "Policy revocation is irreversible. Once revoked, the policy cannot be reinstated. A new policy commitment must be made.",
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to prepare policy commit calldata", detail: err.message });
+  }
+});
+
 // ── 404 handler
 app.use((req, res) => {
   res.status(404).json({
@@ -1305,6 +1546,9 @@ app.use((req, res) => {
       "GET  /v2/agents/:address/receipts              [onchain anchors + offchain metadata]",
       "POST /v2/agents/:address/receipts/meta",
       "POST /v2/agents/:address/identity/link",
+      "POST /v2/passport/identity/prepare-mint    [calldata: mint ERC-8004 identity on Arc or RH Testnet]",
+      "POST /v2/passport/identity/verify          [verify identity onchain across Arc + RH Testnet]",
+      "POST /v2/passport/policy/prepare-commit    [calldata: commit EIP-712 policy to AgentPolicyRegistry]",
     ],
   });
 });

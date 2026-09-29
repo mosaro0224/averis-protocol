@@ -74,7 +74,7 @@ The Agent Economic Passport is a non-custodial, cross-chain identity and reputat
 - ReputationRegistry:     0x8004B663056A597Dffe9eCcC1965A193B7388713  (Arc Testnet + RH Testnet)
 - ValidationRegistry:     0x8004Cb1BF31DAf7788923b405b754f57acEB4272  (Arc Testnet + RH Testnet)
 
-### Passport API Endpoints
+### Passport Read Endpoints
 
 - GET /v2/agents/:address/passport         — full passport summary
 - GET /v2/agents/:address/identity         — ERC-8004 identity across chains
@@ -86,6 +86,44 @@ The Agent Economic Passport is a non-custodial, cross-chain identity and reputat
 - GET /v2/agents/:address/counterparties   — counterparty graph
 - GET /v2/agents/:address/agreements       — active agreements
 - GET /v2/agents/:address/receipts         — verified receipts
+
+### Passport Action Endpoints (non-custodial — agent signs + broadcasts)
+
+All action endpoints return unsigned transaction calldata. The API never holds a private key.
+The agent signs the returned transaction from their own wallet and broadcasts it to the specified chain.
+
+**Register an identity (mint ERC-8004 token):**
+POST /v2/passport/identity/prepare-mint
+Body: { wallet, agentId, metadataURI, chainId }
+- chainId: 5042002 (Arc Testnet) or 46630 (Robinhood Chain Testnet)
+- Returns: { transaction: { to, data, value, chainId }, chain, registryAddress }
+- Agent broadcasts the returned transaction from their wallet
+
+**Verify an agent identity onchain:**
+POST /v2/passport/identity/verify
+Body: { wallet } or { agentId } or { wallet, agentId, chainId }
+- Checks IdentityRegistry on Arc Testnet and Robinhood Chain Testnet
+- Returns: { verified, verifiedChains, identities[] } per chain
+- No auth required — anyone can verify any wallet
+
+**Commit a policy to AgentPolicyRegistry:**
+POST /v2/passport/policy/prepare-commit
+Body: { wallet, agentId, policyHash, contentURIHash, expiresAt }
+- policyHash: keccak256 of the policy document (bytes32, 0x-prefixed)
+- contentURIHash: keccak256 of the IPFS URI (bytes32, optional)
+- expiresAt: unix timestamp (0 = no expiry)
+- Returns: { transaction: { to, data, value, chainId: 46630 }, currentNonce, params }
+- Broadcasts to Robinhood Chain Testnet only (where AgentPolicyRegistry is deployed)
+- Policy commitments are irreversible once confirmed
+
+### Agent Passport Journey
+
+1. POST /v2/passport/identity/verify — check if the agent already has an identity
+2. POST /v2/passport/identity/prepare-mint — if not, get calldata to mint on Arc + RH Testnet
+3. Sign and broadcast the returned transaction from the agent wallet
+4. GET /v2/agents/:address/identity — confirm identity is live onchain
+5. POST /v2/passport/policy/prepare-commit — commit a capability policy
+6. GET /v2/agents/:address/passport — read full passport including identity, policies, reputation
 
 ---
 

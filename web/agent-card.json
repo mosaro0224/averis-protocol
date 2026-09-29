@@ -472,17 +472,46 @@
     }
   },
   "passport_api": {
-    "endpoints": [
-      "/v2/agents/:address/passport",
-      "/v2/agents/:address/identity",
-      "/v2/agents/:address/capabilities",
-      "/v2/agents/:address/policies",
-      "/v2/agents/:address/reputation",
-      "/v2/agents/:address/risk",
-      "/v2/agents/:address/transactions",
-      "/v2/agents/:address/counterparties",
-      "/v2/agents/:address/agreements",
-      "/v2/agents/:address/receipts"
-    ]
-  }
+    "read_endpoints": [
+      "GET /v2/agents/:address/passport",
+      "GET /v2/agents/:address/identity",
+      "GET /v2/agents/:address/capabilities",
+      "GET /v2/agents/:address/policies",
+      "GET /v2/agents/:address/reputation",
+      "GET /v2/agents/:address/risk",
+      "GET /v2/agents/:address/transactions",
+      "GET /v2/agents/:address/counterparties",
+      "GET /v2/agents/:address/agreements",
+      "GET /v2/agents/:address/receipts"
+    ],
+    "action_endpoints": [
+      "POST /v2/passport/identity/prepare-mint   \u2014 returns unsigned calldata to mint ERC-8004 identity on Arc or Robinhood Chain Testnet",
+      "POST /v2/passport/identity/verify         \u2014 verifies agent identity onchain across Arc + Robinhood Chain Testnet",
+      "POST /v2/passport/policy/prepare-commit   \u2014 returns unsigned calldata to commit EIP-712 policy to AgentPolicyRegistry"
+    ],
+    "note": "Action endpoints return unsigned transactions (Option A). The agent signs and broadcasts from their own wallet. No private key is held by the API."
+  },
+  "passport_agent_journey": [
+    {
+      "step": "P1",
+      "action": "prepare_mint_identity",
+      "endpoint": "POST /v2/passport/identity/prepare-mint",
+      "auth": false,
+      "description": "Get unsigned calldata to mint an ERC-8004 identity token. Send {wallet, agentId, metadataURI, chainId}. Broadcast returned transaction from agent wallet."
+    },
+    {
+      "step": "P2",
+      "action": "verify_identity",
+      "endpoint": "POST /v2/passport/identity/verify",
+      "auth": false,
+      "description": "Verify an agent identity onchain across Arc Testnet and Robinhood Chain Testnet. Send {wallet} or {agentId}. Returns verified identities per chain."
+    },
+    {
+      "step": "P3",
+      "action": "prepare_policy_commit",
+      "endpoint": "POST /v2/passport/policy/prepare-commit",
+      "auth": false,
+      "description": "Get unsigned calldata to commit an EIP-712 policy hash to AgentPolicyRegistry on Robinhood Chain Testnet. Send {wallet, agentId, policyHash, contentURIHash, expiresAt}. Broadcast returned transaction from agent wallet."
+    }
+  ]
 }
