@@ -889,7 +889,7 @@ function buildDiscoveryDoc(liveParams) {
         ...MCP_TOOLS.map((t) => ({
           name:              t.name,
           description:       t.description,
-          category:          "finance",
+          category:          t.name.startsWith("averis_passport") ? "passport" : "finance",
           requiresAuth:      t.requiresAuth,
           "x-requires-auth": t.requiresAuth,
         })),
@@ -1039,7 +1039,8 @@ Step 7: Settlement automatic        — ReceivableRouter repays principal+fee
 
 MCP TOOLS (POST /v1/mcp)
 -------------------------
-Send: {"method":"tools/list"} to enumerate all ${MCP_TOOLS.length} tools.
+Send: {"method":"tools/list"} to enumerate all ${MCP_TOOLS.length + MCP_PASSPORT_TOOLS.length} tools (${MCP_TOOLS.length - 3} finance + 3 passport action + ${MCP_PASSPORT_TOOLS.length} passport read).
+Modern endpoint: POST /mcp (MCP 2025-03-26 Streamable HTTP, all ${MCP_TOOLS.length + MCP_PASSPORT_TOOLS.length} tools).
 Key tools: averis_discover, averis_check_eligibility, averis_get_quote,
            averis_request_funding (auth), averis_pool_status, averis_position_status
 
