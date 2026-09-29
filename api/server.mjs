@@ -839,8 +839,8 @@ function buildDiscoveryDoc(liveParams) {
           IdentityRegistry:     "0x8004A818BFB912233c491871b3d84c89A494BD9e",
           ReputationRegistry:   "0x8004B663056A597Dffe9eCcC1965A193B7388713",
           ValidationRegistry:   "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
-          AgentPolicyRegistry:  process.env.PASSPORT_POLICY_REGISTRY  || "0xf7F47493E2f042a428a531724bE62854002979cA",
-          AgentReceiptRegistry: process.env.PASSPORT_RECEIPT_REGISTRY || "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+          AgentPolicyRegistry:  process.env.PASSPORT_POLICY_REGISTRY  || "0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8",
+          AgentReceiptRegistry: process.env.PASSPORT_RECEIPT_REGISTRY || "0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6",
         },
         note: "ERC-8004 registry addresses are CREATE2-deterministic — same address on both chains.",
         read_endpoints: [
@@ -1089,8 +1089,8 @@ PASSPORT CONTRACTS
   IdentityRegistry:     0x8004A818BFB912233c491871b3d84c89A494BD9e  (Arc + RH Testnet)
   ReputationRegistry:   0x8004B663056A597Dffe9eCcC1965A193B7388713  (Arc + RH Testnet)
   ValidationRegistry:   0x8004Cb1BF31DAf7788923b405b754f57acEB4272  (Arc + RH Testnet)
-  AgentPolicyRegistry:  ${process.env.PASSPORT_POLICY_REGISTRY  || "0xf7F47493E2f042a428a531724bE62854002979cA"}  (Robinhood Chain Testnet 46630)
-  AgentReceiptRegistry: ${process.env.PASSPORT_RECEIPT_REGISTRY || "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"}  (Robinhood Chain Testnet 46630)
+  AgentPolicyRegistry:  ${process.env.PASSPORT_POLICY_REGISTRY  || "0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8"}  (Robinhood Chain Testnet 46630)
+  AgentReceiptRegistry: ${process.env.PASSPORT_RECEIPT_REGISTRY || "0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6"}  (Robinhood Chain Testnet 46630)
 
 PASSPORT READ ENDPOINTS (no auth required)
 -------------------------------------------
@@ -1406,8 +1406,8 @@ app.post("/v2/agents/:address/identity/link", (req, res) => {
 // ── Passport action endpoints (Option A — unsigned calldata, agent signs + submits) ──
 
 const ERC8004_IDENTITY_REGISTRY = "0x8004A818BFB912233c491871b3d84c89A494BD9e";
-const PASSPORT_POLICY_REGISTRY  = process.env.PASSPORT_POLICY_REGISTRY  || "0xf7F47493E2f042a428a531724bE62854002979cA";
-const PASSPORT_RECEIPT_REGISTRY = process.env.PASSPORT_RECEIPT_REGISTRY || "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18";
+const PASSPORT_POLICY_REGISTRY  = process.env.PASSPORT_POLICY_REGISTRY  || "0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8";
+const PASSPORT_RECEIPT_REGISTRY = process.env.PASSPORT_RECEIPT_REGISTRY || "0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6";
 
 const RH_RPC_URL = process.env.RH_TESTNET_RPC || "https://rpc.testnet.chain.robinhood.com";
 const RH_CHAIN_OBJ = {
@@ -1429,7 +1429,7 @@ const IDENTITY_MINT_ABI = parseAbi([
 ]);
 
 const POLICY_COMMIT_ABI = parseAbi([
-  "function commitPolicy(address agentWallet, uint256 agentId, address identityRegistry, bytes32 policyHash, bytes32 contentURIHash, uint64 expiresAt) external returns (uint256)",
+  "function commitPolicy(bytes32 policyHash, bytes32 contentURI, uint64 expiresAt, uint256 agentId, address identityRegistry) external returns (uint256)",
   "function nonces(address agentWallet) view returns (uint256)",
 ]);
 
@@ -1710,16 +1710,17 @@ app.post("/v2/passport/policy/prepare-commit", async (req, res) => {
     } catch { /* registry may not have this wallet yet — nonce 0 */ }
 
     const { encodeFunctionData } = await import("viem");
+    // commitPolicy(bytes32 policyHash, bytes32 contentURI, uint64 expiresAt, uint256 agentId, address identityRegistry)
+    // msg.sender must be the agent wallet — no agentWallet param
     const calldata = encodeFunctionData({
       abi: POLICY_COMMIT_ABI,
       functionName: "commitPolicy",
       args: [
-        wallet,
-        BigInt(agentId),
-        ERC8004_IDENTITY_REGISTRY,
         policyHash,
         contentHash,
         BigInt(expiresAt),
+        BigInt(agentId),
+        ERC8004_IDENTITY_REGISTRY,
       ],
     });
 

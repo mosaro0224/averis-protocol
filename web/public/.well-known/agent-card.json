@@ -339,8 +339,8 @@
         "chain_id": 46630,
         "name": "Robinhood Chain Testnet",
         "contracts": {
-          "AgentPolicyRegistry": "0xf7F47493E2f042a428a531724bE62854002979cA",
-          "AgentReceiptRegistry": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"
+          "AgentPolicyRegistry": "0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8",
+          "AgentReceiptRegistry": "0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6"
         }
       },
       "arc_testnet": {
@@ -459,8 +459,8 @@
       ],
       "launch_url": "https://averisprotocol.xyz/passport",
       "passport_contracts": {
-        "AgentPolicyRegistry": "0xf7F47493E2f042a428a531724bE62854002979cA",
-        "AgentReceiptRegistry": "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+        "AgentPolicyRegistry": "0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8",
+        "AgentReceiptRegistry": "0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6",
         "chain_id": 46630
       },
       "erc8004_registries": {

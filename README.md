@@ -75,8 +75,8 @@ The Agent Economic Passport is a non-custodial, cross-chain identity and reputat
 
 | Contract | Address | Chain |
 | --- | --- | --- |
-| AgentPolicyRegistry | `0xf7F47493E2f042a428a531724bE62854002979cA` | Robinhood Chain Testnet (46630) |
-| AgentReceiptRegistry | `0x3477e203fCFFbfe0E419E230d115d7C80A22BB18` | Robinhood Chain Testnet (46630) |
+| AgentPolicyRegistry | `0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8` | Robinhood Chain Testnet (46630) |
+| AgentReceiptRegistry | `0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6` | Robinhood Chain Testnet (46630) |
 | IdentityRegistry (ERC-8004) | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Arc Testnet + RH Testnet |
 | ReputationRegistry (ERC-8004) | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | Arc Testnet + RH Testnet |
 | ValidationRegistry (ERC-8004) | `0x8004Cb1BF31DAf7788923b405b754f57acEB4272` | Arc Testnet + RH Testnet |
@@ -100,14 +100,14 @@ GET  /v2/agents/:address/receipts         — verified receipts from AgentReceip
 
 ```env
 # API (Railway)
-PASSPORT_POLICY_REGISTRY="0xf7F47493E2f042a428a531724bE62854002979cA"
-PASSPORT_RECEIPT_REGISTRY="0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"
+PASSPORT_POLICY_REGISTRY="0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8"
+PASSPORT_RECEIPT_REGISTRY="0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6"
 RH_TESTNET_RPC="https://rpc.testnet.chain.robinhood.com"
 PASSPORT_CHAIN_ID="46630"
 
 # Frontend (Cloudflare Pages)
-VITE_PASSPORT_POLICY_REGISTRY="0xf7F47493E2f042a428a531724bE62854002979cA"
-VITE_PASSPORT_RECEIPT_REGISTRY="0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"
+VITE_PASSPORT_POLICY_REGISTRY="0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8"
+VITE_PASSPORT_RECEIPT_REGISTRY="0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6"
 ```
 
 ---

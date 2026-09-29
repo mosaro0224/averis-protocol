@@ -37,8 +37,8 @@ export const ERC8004_MAINNET = {
 
 /** Passport contracts — deployed on Robinhood Chain Testnet (46630) */
 export const PASSPORT_CONTRACTS = {
-  policyRegistry:  (import.meta.env.VITE_PASSPORT_POLICY_REGISTRY  || '0xf7F47493E2f042a428a531724bE62854002979cA') as `0x${string}`,
-  receiptRegistry: (import.meta.env.VITE_PASSPORT_RECEIPT_REGISTRY || '0x3477e203fCFFbfe0E419E230d115d7C80A22BB18') as `0x${string}`,
+  policyRegistry:  (import.meta.env.VITE_PASSPORT_POLICY_REGISTRY  || '0x018FcD301293B4D8ade587C08BA9Ea30A78C17C8') as `0x${string}`,
+  receiptRegistry: (import.meta.env.VITE_PASSPORT_RECEIPT_REGISTRY || '0xd24CEca0B911426aF3Dd659176A52E0816e0eDf6') as `0x${string}`,
 }
 
 /** Averis Passport API base */
