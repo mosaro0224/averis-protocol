@@ -573,7 +573,7 @@ app.get("/v1/agents/:agent/eligibility", async (req, res) => {
   const agent = req.params.agent;
   try {
     const [creditLimit, exposure, activeJobs, maxJobs, protoMax] = await Promise.all([
-      readContract(CONTRACTS.financing, FINANCING_ABI, "creditLimits", [agent]),
+      readContract(CONTRACTS.financing, FINANCING_ABI, "creditLimits", [agent]).catch(() => 0n),
       readContract(CONTRACTS.hood, HOOD_ABI, "agentExposure", [agent]),
       readContract(CONTRACTS.hood, HOOD_ABI, "activeJobCount", [agent]),
       readContract(CONTRACTS.hood, HOOD_ABI, "maxJobsPerAgent"),
@@ -611,7 +611,7 @@ app.get("/v2/agents/:agent", async (req, res) => {
       readContract(CONTRACTS.hood, HOOD_ABI, "maxExposurePerAgent"),
       readContract(CONTRACTS.hood, HOOD_ABI, "activeJobCount", [agent]),
       readContract(CONTRACTS.hood, HOOD_ABI, "maxJobsPerAgent"),
-      readContract(CONTRACTS.financing, FINANCING_ABI, "creditLimits", [agent]),
+      readContract(CONTRACTS.financing, FINANCING_ABI, "creditLimits", [agent]).catch(() => 0n),
       readContract(CONTRACTS.financing, FINANCING_ABI, "protocolMaximum"),
     ]);
 
