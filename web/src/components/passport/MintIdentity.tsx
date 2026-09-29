@@ -1,26 +1,28 @@
 /**
  * MintIdentity — register an ERC-8004 identity on Arc Testnet, Robinhood Chain Testnet, or both.
- * Calls mint(wallet, agentId, metadataURI) on the IdentityRegistry contract.
+ * Calls register(string agentURI) on the IdentityRegistry contract.
+ * agentId is AUTO-ASSIGNED by the contract — no need for the user to pick one.
  */
 
 import { useState } from 'react'
 import { useAccount, useWalletClient, useSwitchChain } from 'wagmi'
 import { createPublicClient, http, parseAbi } from 'viem'
-import { ERC8004_TESTNET, ARC_TESTNET, RH_TESTNET } from '../../lib/passportConstants'
-import { PASSPORT_API } from '../../lib/passportConstants'
+import { ERC8004_TESTNET, ARC_TESTNET, RH_TESTNET, PASSPORT_API } from '../../lib/passportConstants'
 
 const IDENTITY_ABI = parseAbi([
-  'function mint(address wallet, uint256 agentId, string metadataURI) external returns (uint256)',
-  'function ownerOf(uint256 tokenId) view returns (address)',
+  'function register(string agentURI) external returns (uint256 agentId)',
+  'event Registered(uint256 indexed agentId, string agentURI, address indexed owner)',
 ])
 
 type ChainTarget = 'arc' | 'rh' | 'both'
-type MintStatus = 'idle' | 'switching' | 'minting' | 'linking' | 'done' | 'error'
+type RegStatus = 'idle' | 'switching' | 'registering' | 'linking' | 'done' | 'error'
 
 interface ChainResult {
   chain: string
-  status: 'pending' | 'minting' | 'done' | 'error'
+  chainId: number
+  status: 'pending' | 'registering' | 'done' | 'error'
   txHash?: string
+  agentId?: string
   error?: string
 }
 
@@ -34,23 +36,22 @@ export function MintIdentity({ address, onSuccess }: Props) {
   const { data: walletClient } = useWalletClient()
   const { switchChainAsync } = useSwitchChain()
 
-  const [agentId, setAgentId]         = useState('')
   const [metadataURI, setMetadataURI] = useState('')
   const [target, setTarget]           = useState<ChainTarget>('arc')
-  const [status, setStatus]           = useState<MintStatus>('idle')
+  const [status, setStatus]           = useState<RegStatus>('idle')
   const [results, setResults]         = useState<ChainResult[]>([])
   const [errorMsg, setErrorMsg]       = useState('')
 
   const chains: { key: ChainTarget; label: string; chainId: number; color: string }[] = [
-    { key: 'arc',  label: 'Arc Testnet',              chainId: ARC_TESTNET.id, color: 'text-averis-green' },
-    { key: 'rh',   label: 'Robinhood Chain Testnet',  chainId: RH_TESTNET.id,  color: 'text-blue-400'    },
-    { key: 'both', label: 'Both chains',              chainId: ARC_TESTNET.id, color: 'text-purple-400'  },
+    { key: 'arc',  label: 'Arc Testnet',             chainId: ARC_TESTNET.id, color: 'text-averis-green' },
+    { key: 'rh',   label: 'Robinhood Chain Testnet', chainId: RH_TESTNET.id,  color: 'text-blue-400'    },
+    { key: 'both', label: 'Both chains',             chainId: ARC_TESTNET.id, color: 'text-purple-400'  },
   ]
 
-  async function mintOnChain(targetChainId: number, chainLabel: string): Promise<ChainResult> {
-    if (!walletClient) return { chain: chainLabel, status: 'error', error: 'No wallet client' }
+  async function registerOnChain(targetChainId: number, chainLabel: string): Promise<ChainResult> {
+    if (!walletClient) return { chain: chainLabel, chainId: targetChainId, status: 'error', error: 'No wallet client' }
 
-    setResults(r => r.map(x => x.chain === chainLabel ? { ...x, status: 'minting' } : x))
+    setResults(r => r.map(x => x.chain === chainLabel ? { ...x, status: 'registering' } : x))
 
     try {
       // Switch chain if needed
@@ -59,96 +60,108 @@ export function MintIdentity({ address, onSuccess }: Props) {
         await switchChainAsync({ chainId: targetChainId })
       }
 
-      setStatus('minting')
+      setStatus('registering')
+
+      const rpcUrl = targetChainId === ARC_TESTNET.id ? ARC_TESTNET.rpc : RH_TESTNET.rpc
+      const chainDef = {
+        id: targetChainId,
+        name: chainLabel,
+        nativeCurrency: targetChainId === ARC_TESTNET.id
+          ? ARC_TESTNET.nativeCurrency
+          : RH_TESTNET.nativeCurrency,
+        rpcUrls: { default: { http: [rpcUrl] } },
+      } as any
 
       const hash = await walletClient.writeContract({
         address: ERC8004_TESTNET.identityRegistry,
         abi: IDENTITY_ABI,
-        functionName: 'mint',
-        args: [address as `0x${string}`, BigInt(agentId), metadataURI],
-        chain: targetChainId === ARC_TESTNET.id
-          ? { id: ARC_TESTNET.id, name: ARC_TESTNET.name, nativeCurrency: ARC_TESTNET.nativeCurrency, rpcUrls: { default: { http: [ARC_TESTNET.rpc] } } } as any
-          : { id: RH_TESTNET.id,  name: RH_TESTNET.name,  nativeCurrency: RH_TESTNET.nativeCurrency,  rpcUrls: { default: { http: [RH_TESTNET.rpc] } } } as any,
+        functionName: 'register',
+        args: [metadataURI],
+        chain: chainDef,
       })
 
-      // Wait for receipt
-      const publicClient = createPublicClient({
-        chain: { id: targetChainId, name: chainLabel, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [targetChainId === ARC_TESTNET.id ? ARC_TESTNET.rpc : RH_TESTNET.rpc] } } } as any,
-        transport: http(targetChainId === ARC_TESTNET.id ? ARC_TESTNET.rpc : RH_TESTNET.rpc),
-      })
-      await publicClient.waitForTransactionReceipt({ hash })
+      // Wait for receipt and parse assigned agentId from Registered event
+      const publicClient = createPublicClient({ chain: chainDef, transport: http(rpcUrl) })
+      const receipt = await publicClient.waitForTransactionReceipt({ hash })
 
-      return { chain: chainLabel, status: 'done', txHash: hash }
+      // Registered(uint256 indexed agentId, string agentURI, address indexed owner)
+      // topics[1] = agentId (indexed)
+      let assignedAgentId: string | undefined
+      for (const log of receipt.logs) {
+        if (log.topics[1]) {
+          assignedAgentId = BigInt(log.topics[1]).toString()
+          break
+        }
+      }
+
+      return { chain: chainLabel, chainId: targetChainId, status: 'done', txHash: hash, agentId: assignedAgentId }
     } catch (err: any) {
-      return { chain: chainLabel, status: 'error', error: err.shortMessage ?? err.message ?? 'Unknown error' }
+      return { chain: chainLabel, chainId: targetChainId, status: 'error', error: err.shortMessage ?? err.message ?? 'Unknown error' }
     }
   }
 
-  async function handleMint() {
-    if (!agentId || !metadataURI) { setErrorMsg('Agent ID and Metadata URI are required'); return }
-    if (!walletClient)            { setErrorMsg('Connect your wallet first'); return }
-    if (isNaN(Number(agentId)) || Number(agentId) < 0) { setErrorMsg('Agent ID must be a positive number'); return }
+  async function handleRegister() {
+    if (!metadataURI) { setErrorMsg('Metadata URI is required'); return }
+    if (!walletClient) { setErrorMsg('Connect your wallet first'); return }
 
     setErrorMsg('')
-    setStatus('minting')
+    setStatus('registering')
 
     const targets: { chainId: number; label: string }[] =
       target === 'arc'  ? [{ chainId: ARC_TESTNET.id, label: 'Arc Testnet' }] :
       target === 'rh'   ? [{ chainId: RH_TESTNET.id,  label: 'Robinhood Chain Testnet' }] :
       [{ chainId: ARC_TESTNET.id, label: 'Arc Testnet' }, { chainId: RH_TESTNET.id, label: 'Robinhood Chain Testnet' }]
 
-    setResults(targets.map(t => ({ chain: t.label, status: 'pending' })))
+    setResults(targets.map(t => ({ chain: t.label, chainId: t.chainId, status: 'pending' })))
 
     const finalResults: ChainResult[] = []
 
     for (const t of targets) {
-      const result = await mintOnChain(t.chainId, t.label)
+      const result = await registerOnChain(t.chainId, t.label)
       finalResults.push(result)
       setResults(r => r.map(x => x.chain === t.label ? result : x))
     }
 
-    // Link identities to Passport API store for each successful mint
+    // Link identities to Passport API store for each successful registration
     setStatus('linking')
     for (const r of finalResults) {
       if (r.status !== 'done') continue
-      const caip2 = r.chain === 'Arc Testnet' ? 'eip155:5042002' : 'eip155:46630'
+      const caip2 = r.chainId === ARC_TESTNET.id ? 'eip155:5042002' : 'eip155:46630'
       try {
         await fetch(`${PASSPORT_API}/v2/agents/${address}/identity/link`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             caip2,
-            agentId: Number(agentId),
+            agentId: r.agentId ? Number(r.agentId) : undefined,
             registryAddress: ERC8004_TESTNET.identityRegistry,
             metadataURI,
             linkTxHash: r.txHash,
           }),
         })
-      } catch { /* non-fatal — identity will still appear on next chain read */ }
+      } catch { /* non-fatal — identity will appear on next chain read */ }
     }
 
     const anySuccess = finalResults.some(r => r.status === 'done')
     const anyError   = finalResults.some(r => r.status === 'error')
 
-    if (anySuccess && !anyError) {
+    if (anySuccess) {
       setStatus('done')
       setTimeout(onSuccess, 1500)
-    } else if (anySuccess && anyError) {
-      setStatus('done') // partial success
-      setTimeout(onSuccess, 1500)
-    } else {
+    } else if (anyError) {
       setStatus('error')
     }
   }
 
-  const busy = status === 'switching' || status === 'minting' || status === 'linking'
+  const busy = status === 'switching' || status === 'registering' || status === 'linking'
 
   return (
     <div className="border border-averis-line rounded p-6 space-y-5 bg-averis-card">
       <div>
         <h3 className="font-mono text-[10px] tracking-[0.14em] text-averis-text mb-1">REGISTER ERC-8004 IDENTITY</h3>
         <p className="font-mono text-[9px] text-averis-muted/70">
-          Mint an onchain identity token for this wallet. After minting, your identity will be readable on any supported chain.
+          Register an onchain identity token for this wallet. Your Agent ID will be automatically assigned by the registry.
+          After registration, your identity is readable on any supported chain.
         </p>
       </div>
 
@@ -175,33 +188,18 @@ export function MintIdentity({ address, onSuccess }: Props) {
         </div>
       </div>
 
-      {/* Agent ID */}
-      <div className="space-y-1.5">
-        <label className="font-mono text-[9px] text-averis-muted uppercase">Agent ID</label>
-        <input
-          type="number"
-          min="1"
-          value={agentId}
-          onChange={e => setAgentId(e.target.value)}
-          placeholder="e.g. 900958"
-          disabled={busy}
-          className="w-full font-mono text-[10px] bg-[#1a1a1a] border border-[#444] rounded px-3 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-blue-400 disabled:opacity-50"
-        />
-        <p className="font-mono text-[9px] text-averis-muted/60">A unique numeric ID for this agent. Must not already be minted.</p>
-      </div>
-
       {/* Metadata URI */}
       <div className="space-y-1.5">
-        <label className="font-mono text-[9px] text-averis-muted uppercase">Metadata URI</label>
+        <label className="font-mono text-[9px] text-averis-muted uppercase">Agent URI</label>
         <input
           type="text"
           value={metadataURI}
           onChange={e => setMetadataURI(e.target.value)}
-          placeholder="https:// or ipfs://"
+          placeholder="https://averisprotocol.xyz/.well-known/agent-card.json"
           disabled={busy}
           className="w-full font-mono text-[10px] bg-[#1a1a1a] border border-[#444] rounded px-3 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-blue-400 disabled:opacity-50"
         />
-        <p className="font-mono text-[9px] text-averis-muted/60">URL or IPFS hash pointing to an agent.json describing this agent.</p>
+        <p className="font-mono text-[9px] text-averis-muted/60">URL or IPFS hash pointing to an agent-card.json describing this agent.</p>
       </div>
 
       {/* Error */}
@@ -215,17 +213,20 @@ export function MintIdentity({ address, onSuccess }: Props) {
           {results.map(r => (
             <div key={r.chain} className="flex items-center gap-3">
               <span className={[
-                'font-mono text-[9px] w-2 h-2 rounded-full shrink-0',
-                r.status === 'done'    ? 'bg-emerald-400' :
-                r.status === 'error'   ? 'bg-red-400'     :
-                r.status === 'minting' ? 'bg-amber-400 animate-pulse' :
+                'w-2 h-2 rounded-full shrink-0',
+                r.status === 'done'        ? 'bg-emerald-400' :
+                r.status === 'error'       ? 'bg-red-400'     :
+                r.status === 'registering' ? 'bg-amber-400 animate-pulse' :
                 'bg-averis-line',
               ].join(' ')} />
               <span className="font-mono text-[10px] text-averis-text">{r.chain}</span>
+              {r.agentId && r.status === 'done' && (
+                <span className="font-mono text-[9px] text-averis-muted">ID: {r.agentId}</span>
+              )}
               <span className={`font-mono text-[9px] ml-auto ${r.status === 'done' ? 'text-emerald-400' : r.status === 'error' ? 'text-red-400' : 'text-averis-muted'}`}>
-                {r.status === 'pending' ? 'QUEUED' :
-                 r.status === 'minting' ? 'MINTING...' :
-                 r.status === 'done'    ? 'REGISTERED' :
+                {r.status === 'pending'     ? 'QUEUED'       :
+                 r.status === 'registering' ? 'REGISTERING...' :
+                 r.status === 'done'        ? 'REGISTERED'   :
                  r.error ?? 'FAILED'}
               </span>
             </div>
@@ -241,14 +242,14 @@ export function MintIdentity({ address, onSuccess }: Props) {
 
       {/* Submit */}
       <button
-        onClick={handleMint}
-        disabled={busy || !agentId || !metadataURI}
+        onClick={handleRegister}
+        disabled={busy || !metadataURI}
         className="flex items-center gap-2 font-mono text-[10px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-5 py-2.5 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {busy ? (
           <>
             <span className="w-3 h-3 border border-averis-greendark/60 border-t-averis-greendark rounded-full animate-spin" />
-            {status === 'switching' ? 'SWITCHING CHAIN...' : status === 'linking' ? 'LINKING...' : 'MINTING...'}
+            {status === 'switching' ? 'SWITCHING CHAIN...' : status === 'linking' ? 'LINKING...' : 'REGISTERING...'}
           </>
         ) : (
           <>

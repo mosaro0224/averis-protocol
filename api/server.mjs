@@ -1445,32 +1445,26 @@ app.post("/v2/passport/identity/prepare-mint", async (req, res) => {
   if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) {
     return res.status(400).json({ error: "wallet must be a valid 0x address" });
   }
-  if (isNaN(Number(agentId)) || Number(agentId) < 0) {
-    return res.status(400).json({ error: "agentId must be a non-negative integer" });
-  }
+  // agentId is auto-assigned by the contract — ignore any provided value
   if (![5042002, 46630].includes(Number(chainId))) {
     return res.status(400).json({ error: "chainId must be 5042002 (Arc Testnet) or 46630 (Robinhood Chain Testnet)" });
   }
 
   try {
-    // Check agentId is not already minted
-    const client = Number(chainId) === 46630 ? getRhPassportClient() : publicClient;
-    let alreadyMinted = false;
-    try {
-      await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: IDENTITY_MINT_ABI, functionName: "ownerOf", args: [BigInt(agentId)] });
-      alreadyMinted = true;
-    } catch { /* ownerOf reverts if token does not exist */ }
-
-    if (alreadyMinted) {
-      return res.status(409).json({ error: `agentId ${agentId} is already minted on chain ${chainId}` });
-    }
-
-    // Encode calldata
+    // The IdentityRegistry uses register(string agentURI) — agentId is auto-assigned by the contract.
+    // There is no mint(wallet, agentId, uri) function.
     const { encodeFunctionData } = await import("viem");
+    const REGISTER_ABI = [{
+      name: "register",
+      type: "function",
+      inputs: [{ name: "agentURI", type: "string" }],
+      outputs: [{ name: "agentId", type: "uint256" }],
+      stateMutability: "nonpayable",
+    }];
     const calldata = encodeFunctionData({
-      abi: IDENTITY_MINT_ABI,
-      functionName: "mint",
-      args: [wallet, BigInt(agentId), metadataURI],
+      abi: REGISTER_ABI,
+      functionName: "register",
+      args: [metadataURI || ""],
     });
 
     const chainName = Number(chainId) === 46630 ? "Robinhood Chain Testnet" : "Arc Testnet";
@@ -1479,21 +1473,22 @@ app.post("/v2/passport/identity/prepare-mint", async (req, res) => {
       : "https://explorer.testnet.arc.io";
 
     return res.json({
-      action: "mint_identity",
-      instructions: "Sign and broadcast this transaction from the wallet address. The wallet will become the owner of the identity token.",
+      action: "register_identity",
+      instructions: "Sign and broadcast this transaction from the wallet address. The agentId will be auto-assigned by the registry contract and returned in the transaction receipt logs.",
       transaction: {
-        to:       ERC8004_IDENTITY_REGISTRY,
-        data:     calldata,
-        value:    "0x0",
-        chainId:  Number(chainId),
+        to:      ERC8004_IDENTITY_REGISTRY,
+        data:    calldata,
+        value:   "0x0",
+        chainId: Number(chainId),
       },
-      params: { wallet, agentId: Number(agentId), metadataURI, chainId: Number(chainId) },
+      params: { wallet, metadataURI: metadataURI || "", chainId: Number(chainId) },
       chain: { id: Number(chainId), name: chainName, explorer },
       registryAddress: ERC8004_IDENTITY_REGISTRY,
-      note: "No gas fee in USDC is required beyond the network transaction fee. On Arc Testnet, gas is paid in USDC.",
+      agentId_note: "agentId is auto-assigned by the contract. Read it from the Registered(agentId, agentURI, owner) event in the transaction receipt.",
+      note: "On Arc Testnet, gas is paid in USDC. On Robinhood Chain Testnet, gas is paid in native RH token.",
     });
   } catch (err) {
-    return res.status(500).json({ error: "Failed to prepare mint calldata", detail: err.message });
+    return res.status(500).json({ error: "Failed to prepare register calldata", detail: err.message });
   }
 });
 
