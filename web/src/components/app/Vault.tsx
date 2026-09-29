@@ -1,35 +1,69 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits, formatUnits, maxUint256 } from 'viem'
 import { CONTRACTS, USDC_DECIMALS } from '../../lib/constants'
 import { VAULT_ABI, ERC20_ABI } from '../../lib/abis'
 
-type Mode = 'deposit' | 'withdraw'
+type Mode   = 'deposit' | 'withdraw'
+type Notice = { type: 'success' | 'error'; msg: string } | null
 
 export function Vault() {
   const { address } = useAccount()
-  const [mode, setMode] = useState<Mode>('deposit')
+  const [mode,   setMode]   = useState<Mode>('deposit')
   const [amount, setAmount] = useState('')
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>()
+  const [notice, setNotice] = useState<Notice>(null)
 
-  const { data: totalAssets }  = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'totalAssets' })
-  const { data: available }    = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'availableLiquidity' })
-  const { data: outstanding }  = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'outstandingPrincipal' })
-  const { data: usdcBalance }  = useReadContract({ address: CONTRACTS.usdc, abi: ERC20_ABI, functionName: 'balanceOf', args: address ? [address] : undefined, query: { enabled: !!address } })
-  const { data: vaultShares }  = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'balanceOf', args: address ? [address] : undefined, query: { enabled: !!address } })
-  const { data: maxWithdraw }  = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'maxWithdraw', args: address ? [address] : undefined, query: { enabled: !!address } })
-  const { data: allowance }    = useReadContract({ address: CONTRACTS.usdc, abi: ERC20_ABI, functionName: 'allowance', args: address ? [address, CONTRACTS.vault] : undefined, query: { enabled: !!address } })
-  const { data: suppliedAmt }  = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'convertToAssets', args: vaultShares ? [vaultShares] : undefined, query: { enabled: !!vaultShares } })
+  // ── On-chain reads ────────────────────────────────────────────────────────
+  const { data: totalAssets, refetch: refetchTotal }     = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'totalAssets' })
+  const { data: available,   refetch: refetchAvail }     = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'availableLiquidity' })
+  const { data: outstanding, refetch: refetchOut }       = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'outstandingPrincipal' })
+  const { data: usdcBalance, refetch: refetchUsdc }      = useReadContract({ address: CONTRACTS.usdc,  abi: ERC20_ABI,  functionName: 'balanceOf',       args: address ? [address] : undefined,                           query: { enabled: !!address } })
+  const { data: vaultShares, refetch: refetchShares }    = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'balanceOf',       args: address ? [address] : undefined,                           query: { enabled: !!address } })
+  const { data: maxWithdraw, refetch: refetchMaxW }      = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'maxWithdraw',     args: address ? [address] : undefined,                           query: { enabled: !!address } })
+  const { data: allowance,   refetch: refetchAllowance } = useReadContract({ address: CONTRACTS.usdc,  abi: ERC20_ABI,  functionName: 'allowance',       args: address ? [address, CONTRACTS.vault] : undefined,          query: { enabled: !!address } })
+  const { data: suppliedAmt, refetch: refetchSupplied }  = useReadContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'convertToAssets', args: vaultShares ? [vaultShares] : undefined,                   query: { enabled: !!vaultShares } })
 
+  // ── Write + wait ──────────────────────────────────────────────────────────
   const { writeContract, isPending } = useWriteContract()
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash })
+  const { isLoading: isConfirming, isSuccess, isError } = useWaitForTransactionReceipt({ hash: txHash })
 
+  // ── Refresh all reads + show toast when tx settles ────────────────────────
+  useEffect(() => {
+    if (isSuccess) {
+      Promise.all([
+        refetchTotal(), refetchAvail(), refetchOut(),
+        refetchUsdc(), refetchShares(), refetchMaxW(),
+        refetchAllowance(), refetchSupplied(),
+      ])
+      const action = mode === 'deposit'
+        ? (allowance !== undefined && allowance < (amount ? parseUnits(amount, USDC_DECIMALS) : 0n) ? 'Approval' : 'Deposit')
+        : 'Withdrawal'
+      setNotice({ type: 'success', msg: `${action} confirmed.` })
+      setAmount('')
+      setTxHash(undefined)
+    }
+    if (isError) {
+      setNotice({ type: 'error', msg: 'Transaction failed. Please try again.' })
+      setTxHash(undefined)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuccess, isError])
+
+  // Auto-dismiss notice after 5 s
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 5000)
+    return () => clearTimeout(t)
+  }, [notice])
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const fmt = (v: bigint | undefined, dec = USDC_DECIMALS) =>
     v !== undefined ? parseFloat(formatUnits(v, dec)).toFixed(2) : '0.00'
   const fmtShares = (v: bigint | undefined) =>
     v !== undefined ? parseFloat(formatUnits(v, USDC_DECIMALS)).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'
 
-  const amountBig = amount ? parseUnits(amount, USDC_DECIMALS) : 0n
+  const amountBig     = amount ? parseUnits(amount, USDC_DECIMALS) : 0n
   const needsApproval = mode === 'deposit' && allowance !== undefined && allowance < amountBig
 
   function handleAction() {
@@ -37,20 +71,43 @@ export function Vault() {
     const parsed = parseUnits(amount, USDC_DECIMALS)
     if (mode === 'deposit') {
       if (needsApproval) {
-        writeContract({ address: CONTRACTS.usdc, abi: ERC20_ABI, functionName: 'approve', args: [CONTRACTS.vault, maxUint256] },
-          { onSuccess: (h) => setTxHash(h) })
+        writeContract(
+          { address: CONTRACTS.usdc, abi: ERC20_ABI, functionName: 'approve', args: [CONTRACTS.vault, maxUint256] },
+          { onSuccess: (h) => setTxHash(h), onError: () => setNotice({ type: 'error', msg: 'Approval rejected.' }) }
+        )
       } else {
-        writeContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'deposit', args: [parsed, address] },
-          { onSuccess: (h) => setTxHash(h) })
+        writeContract(
+          { address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'deposit', args: [parsed, address] },
+          { onSuccess: (h) => setTxHash(h), onError: () => setNotice({ type: 'error', msg: 'Deposit rejected.' }) }
+        )
       }
     } else {
-      writeContract({ address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'withdraw', args: [parsed, address, address] },
-        { onSuccess: (h) => setTxHash(h) })
+      writeContract(
+        { address: CONTRACTS.vault, abi: VAULT_ABI, functionName: 'withdraw', args: [parsed, address, address] },
+        { onSuccess: (h) => setTxHash(h), onError: () => setNotice({ type: 'error', msg: 'Withdrawal rejected.' }) }
+      )
     }
   }
 
   return (
     <div className="w-full px-8 py-8 space-y-8">
+
+      {/* Toast notification */}
+      {notice && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 border font-mono text-[11px] shadow-lg
+          ${notice.type === 'success'
+            ? 'bg-[#0d1f12] border-averis-green text-averis-green'
+            : 'bg-[#1f0d0d] border-red-400 text-red-400'}`}>
+          <span>{notice.type === 'success' ? '✓' : '✕'}</span>
+          <span>{notice.msg}</span>
+          <button
+            onClick={() => setNotice(null)}
+            className="ml-2 bg-transparent border-0 cursor-pointer text-current opacity-60 hover:opacity-100">
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <div className="font-mono text-[9px] tracking-[0.14em] text-averis-muted mb-3">LIQUIDITY VAULT</div>
@@ -64,8 +121,8 @@ export function Vault() {
       <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-averis-line border border-averis-line">
         {[
           ['TOTAL ASSETS', `$${fmt(totalAssets)}`],
-          ['AVAILABLE', `$${fmt(available)}`],
-          ['DEPLOYED', `$${fmt(outstanding)}`],
+          ['AVAILABLE',    `$${fmt(available)}`],
+          ['DEPLOYED',     `$${fmt(outstanding)}`],
           ['YOUR DEPOSIT', `$${fmt(suppliedAmt)}`],
         ].map(([label, value]) => (
           <div key={label} className="p-4">
@@ -78,12 +135,13 @@ export function Vault() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Deposit / Withdraw form */}
         <div className="border border-averis-line">
-          {/* Mode toggle */}
           <div className="flex border-b border-averis-line">
             {(['deposit', 'withdraw'] as Mode[]).map(m => (
               <button key={m} onClick={() => setMode(m)}
                 className={`flex-1 font-mono text-[10px] tracking-[0.08em] py-3 border-b-2 transition-colors bg-transparent border-l-0 border-r-0 border-t-0 cursor-pointer uppercase
-                  ${mode === m ? 'text-averis-green border-averis-green' : 'text-averis-muted border-transparent hover:text-averis-text'}`}>
+                  ${mode === m
+                    ? 'text-averis-green border-averis-green'
+                    : 'text-averis-muted border-transparent hover:text-averis-text'}`}>
                 {m}
               </button>
             ))}
@@ -97,7 +155,8 @@ export function Vault() {
                     <label className="font-mono text-[9px] tracking-[0.14em] text-averis-muted">
                       {mode === 'deposit' ? 'AMOUNT (USDC)' : 'AMOUNT TO WITHDRAW (USDC)'}
                     </label>
-                    <button onClick={() => setAmount(mode === 'deposit' ? fmt(usdcBalance) : fmt(maxWithdraw))}
+                    <button
+                      onClick={() => setAmount(mode === 'deposit' ? fmt(usdcBalance) : fmt(maxWithdraw))}
                       className="font-mono text-[8px] text-averis-green bg-transparent border-0 cursor-pointer hover:opacity-80">
                       MAX
                     </button>
@@ -111,7 +170,9 @@ export function Vault() {
                     className="w-full bg-averis-bg border border-averis-line focus:border-averis-linemid outline-none font-mono text-[13px] text-averis-text px-3 py-2.5 placeholder:text-averis-muted2"
                   />
                   <div className="font-mono text-[9px] text-averis-muted mt-1">
-                    {mode === 'deposit' ? `Wallet: $${fmt(usdcBalance)} USDC` : `Max withdraw: $${fmt(maxWithdraw)}`}
+                    {mode === 'deposit'
+                      ? `Wallet: $${fmt(usdcBalance)} USDC`
+                      : `Max withdraw: $${fmt(maxWithdraw)}`}
                   </div>
                 </div>
 
@@ -129,7 +190,14 @@ export function Vault() {
 
                 {txHash && (
                   <div className="font-mono text-[9px] text-averis-muted break-all">
-                    TX: {txHash}
+                    TX:{' '}
+                    <a
+                      href={`https://explorer.testnet.arc.io/tx/${txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:underline">
+                      {txHash.slice(0, 18)}…
+                    </a>
                   </div>
                 )}
               </>
@@ -148,9 +216,9 @@ export function Vault() {
           </div>
           <div className="p-5 space-y-4">
             {[
-              ['Vault shares', fmtShares(vaultShares)],
+              ['Vault shares',   fmtShares(vaultShares)],
               ['USDC deposited', `$${fmt(suppliedAmt)}`],
-              ['Wallet USDC', `$${fmt(usdcBalance)}`],
+              ['Wallet USDC',    `$${fmt(usdcBalance)}`],
             ].map(([label, value]) => (
               <div key={label} className="flex items-center justify-between">
                 <span className="font-mono text-[10px] text-averis-muted">{label}</span>
