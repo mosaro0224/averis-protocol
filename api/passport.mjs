@@ -19,8 +19,8 @@ import * as store from "./passport-store.mjs";
 // ── Passport contract ABIs ─────────────────────────────────────────────────────
 
 const POLICY_REGISTRY_ABI = parseAbi([
-  "function getPolicies(address agentWallet) view returns (uint256[])",
-  "function policies(uint256 policyId) view returns (uint256 policyId, uint256 version, address agentWallet, uint256 agentId, address identityRegistry, bytes32 policyHash, bytes32 contentURIHash, uint64 createdAt, uint64 updatedAt, uint64 expiresAt, bool revoked)",
+  "function getAgentPolicies(address agentWallet) external view returns (uint256[])",
+  "function policies(uint256 policyId) view returns (uint256 policyId, uint256 version, address agentWallet, uint256 agentId, address identityRegistry, bytes32 policyHash, bytes32 contentURI, uint64 createdAt, uint64 updatedAt, uint64 expiresAt, bool revoked)",
   "function nonces(address agentWallet) view returns (uint256)",
 ]);
 
@@ -144,7 +144,7 @@ export async function getPolicies(wallet) {
       policyIds = await client.readContract({
         address: policyRegistry,
         abi: POLICY_REGISTRY_ABI,
-        functionName: "getPolicies",
+        functionName: "getAgentPolicies",
         args: [wallet],
       });
     } catch {
@@ -173,7 +173,7 @@ export async function getPolicies(wallet) {
       agentId:         Number(p.agentId),
       identityRegistry: p.identityRegistry,
       policyHash:      p.policyHash,
-      contentURIHash:  p.contentURIHash,
+      contentURIHash:  p.contentURI,
       createdAt:       Number(p.createdAt),
       updatedAt:       Number(p.updatedAt),
       expiresAt:       Number(p.expiresAt),
