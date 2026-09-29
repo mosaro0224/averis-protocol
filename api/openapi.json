@@ -865,23 +865,188 @@
       "get": {
         "summary": "Check adapter registration for an external protocol",
         "operationId": "getRegistry",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
+        "parameters": [{"name": "protocol","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Adapter registration and tier"}}
+      }
+    },
+    "/v2/agents/{address}/passport": {
+      "get": {
+        "summary": "Full Agent Economic Passport",
+        "description": "Returns the complete Averis Passport for an agent: ERC-8004 identity, capabilities, policy commitments, reputation evidence, risk tier, and Averis Bank integration summary.",
+        "operationId": "getAgentPassport",
+        "tags": ["Passport"],
+        "x-agent-facing": true,
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"},"description": "Agent wallet address (0x...)"}],
+        "responses": {"200": {"description": "Full passport object"}, "404": {"description": "Agent not found"}}
+      }
+    },
+    "/v2/agents/{address}/identity": {
+      "get": {
+        "summary": "ERC-8004 Agent Identity",
+        "description": "Resolves ERC-8004 identity for an agent across Arc Testnet (5042002) and Robinhood Chain Testnet (46630). Returns agentId, wallet, metadataURI, and verification status per chain.",
+        "operationId": "getAgentIdentity",
+        "tags": ["Passport"],
+        "x-agent-facing": true,
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Identity records per chain"}}
+      }
+    },
+    "/v2/agents/{address}/capabilities": {
+      "get": {
+        "summary": "Agent Declared Capabilities",
+        "description": "Returns declared capabilities for an agent (research, coding, payments, DeFi, etc.).",
+        "operationId": "getAgentCapabilities",
+        "tags": ["Passport"],
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Capability list"}}
+      }
+    },
+    "/v2/agents/{address}/policies": {
+      "get": {
+        "summary": "Agent Policy Commitments",
+        "description": "Returns onchain EIP-712 policy commitments from AgentPolicyRegistry on Robinhood Chain Testnet. Includes version, expiry, revocation status, and policy hashes.",
+        "operationId": "getAgentPolicies",
+        "tags": ["Passport"],
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Policy commitment list"}}
+      }
+    },
+    "/v2/agents/{address}/reputation": {
+      "get": {
+        "summary": "Agent Reputation Evidence",
+        "description": "Returns evidence-based reputation: jobs completed/failed/disputed, payments, financing repaid, outstanding obligations, counterparties, receipts. Not a score — raw evidence.",
+        "operationId": "getAgentReputation",
+        "tags": ["Passport"],
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Reputation evidence object"}}
+      }
+    },
+    "/v2/agents/{address}/risk": {
+      "get": {
+        "summary": "Agent Risk Profile",
+        "description": "Returns risk tier (UNRATED/ELIGIBLE/ACTIVE/HIGH_UTILIZATION/AT_LIMIT), credit capacity, exposure, and contributing risk factors from Averis Bank.",
+        "operationId": "getAgentRisk",
+        "tags": ["Passport"],
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Risk profile"}}
+      }
+    },
+    "/v2/agents/{address}/transactions": {
+      "get": {
+        "summary": "Agent Transaction History",
+        "description": "Economic transaction history. Filter by type (JOB_PAYMENT, FINANCING, CREDIT_REPAYMENT, ESCROW, etc.) and status.",
+        "operationId": "getAgentTransactions",
+        "tags": ["Passport"],
         "parameters": [
-          {
-            "name": "protocol",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
+          {"name": "address","in": "path","required": true,"schema": {"type": "string"}},
+          {"name": "type","in": "query","schema": {"type": "string"},"description": "Filter by transaction type"},
+          {"name": "status","in": "query","schema": {"type": "string"},"description": "Filter by status"}
         ],
+        "responses": {"200": {"description": "Transaction list"}}
+      }
+    },
+    "/v2/agents/{address}/counterparties": {
+      "get": {
+        "summary": "Agent Counterparty Graph",
+        "description": "Returns counterparty relationship graph — agents and platforms this agent has transacted with.",
+        "operationId": "getAgentCounterparties",
+        "tags": ["Passport"],
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Counterparty list"}}
+      }
+    },
+    "/v2/agents/{address}/agreements": {
+      "get": {
+        "summary": "Agent Active Agreements",
+        "description": "Returns active agreements and obligations for an agent.",
+        "operationId": "getAgentAgreements",
+        "tags": ["Passport"],
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Agreement list"}}
+      }
+    },
+    "/v2/agents/{address}/receipts": {
+      "get": {
+        "summary": "Agent Verified Receipts",
+        "description": "Returns append-only economic receipts from AgentReceiptRegistry. Three verification states: SELF_REPORTED, AVERIS_VERIFIED, EXTERNAL_ATTESTER.",
+        "operationId": "getAgentReceipts",
+        "tags": ["Passport"],
+        "parameters": [{"name": "address","in": "path","required": true,"schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Receipt list"}}
+      }
+    },
+    "/v2/passport/identity/verify": {
+      "post": {
+        "summary": "Verify Agent Identity Onchain",
+        "description": "Check whether an agent wallet has a registered ERC-8004 identity on Arc Testnet and/or Robinhood Chain Testnet. Returns per-chain identity records, verified boolean, and verifiedChains array. No auth required.",
+        "operationId": "verifyPassportIdentity",
+        "tags": ["Passport"],
+        "x-agent-facing": true,
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {
+            "type": "object",
+            "properties": {
+              "wallet":  {"type": "string", "description": "Agent wallet address (0x...)"},
+              "agentId": {"type": "integer", "description": "ERC-8004 token ID (optional)"},
+              "chainId": {"type": "integer", "description": "5042002 or 46630 — omit to check both"}
+            }
+          }}}
+        },
+        "responses": {"200": {"description": "Identity verification result with per-chain records"}}
+      }
+    },
+    "/v2/passport/identity/prepare-mint": {
+      "post": {
+        "summary": "Prepare Identity Mint Transaction",
+        "description": "Returns unsigned calldata to mint an ERC-8004 identity token. The agent signs and broadcasts from their own wallet — the API never holds a key. Call verify first to confirm identity does not already exist.",
+        "operationId": "preparePassportMint",
+        "tags": ["Passport"],
+        "x-agent-facing": true,
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {
+            "type": "object",
+            "required": ["wallet", "agentId", "metadataURI", "chainId"],
+            "properties": {
+              "wallet":      {"type": "string", "description": "Agent wallet address (0x...)"},
+              "agentId":     {"type": "integer", "description": "ERC-8004 token ID to mint (must be unique)"},
+              "metadataURI": {"type": "string", "description": "URI pointing to agent metadata JSON"},
+              "chainId":     {"type": "integer", "description": "5042002 (Arc Testnet) or 46630 (Robinhood Chain Testnet)"}
+            }
+          }}}
+        },
         "responses": {
-          "200": {
-            "description": "Adapter registration and tier"
-          }
+          "200": {"description": "Unsigned transaction ready to broadcast"},
+          "400": {"description": "Invalid parameters or agentId already minted"}
+        }
+      }
+    },
+    "/v2/passport/policy/prepare-commit": {
+      "post": {
+        "summary": "Prepare Policy Commit Transaction",
+        "description": "Returns unsigned calldata to commit a capability policy hash to AgentPolicyRegistry on Robinhood Chain Testnet (46630). Policy commitments are irreversible once confirmed onchain.",
+        "operationId": "preparePassportPolicyCommit",
+        "tags": ["Passport"],
+        "x-agent-facing": true,
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {
+            "type": "object",
+            "required": ["wallet", "agentId", "policyHash"],
+            "properties": {
+              "wallet":         {"type": "string", "description": "Agent wallet address (0x...)"},
+              "agentId":        {"type": "integer", "description": "ERC-8004 token ID"},
+              "policyHash":     {"type": "string", "description": "keccak256 hash of policy document (bytes32, 0x-prefixed)"},
+              "contentURIHash": {"type": "string", "description": "keccak256 hash of IPFS content URI (optional)"},
+              "expiresAt":      {"type": "integer", "description": "Unix timestamp expiry (0 = no expiry)"}
+            }
+          }}}
+        },
+        "responses": {
+          "200": {"description": "Unsigned transaction + current nonce"},
+          "400": {"description": "Invalid parameters"}
         }
       }
     }
@@ -924,19 +1089,4 @@
       "description": "Averis Passport — cross-chain agent identity and reputation (ERC-8004, EIP-712 policies, economic receipts)"
     }
   ],
-  "x-passport-paths": {
-    "/v2/agents/{address}/passport":       "GET  — full passport summary",
-    "/v2/agents/{address}/identity":       "GET  — ERC-8004 identity across chains",
-    "/v2/agents/{address}/capabilities":   "GET  — declared capabilities",
-    "/v2/agents/{address}/policies":       "GET  — policy commitments",
-    "/v2/agents/{address}/reputation":     "GET  — reputation score and tier",
-    "/v2/agents/{address}/risk":           "GET  — risk profile and signals",
-    "/v2/agents/{address}/transactions":   "GET  — transaction history",
-    "/v2/agents/{address}/counterparties": "GET  — counterparty graph",
-    "/v2/agents/{address}/agreements":     "GET  — active agreements",
-    "/v2/agents/{address}/receipts":       "GET  — verified receipts",
-    "/v2/passport/identity/prepare-mint":  "POST — unsigned calldata to mint ERC-8004 identity",
-    "/v2/passport/identity/verify":        "POST — verify agent identity onchain across both chains",
-    "/v2/passport/policy/prepare-commit":  "POST — unsigned calldata to commit policy to AgentPolicyRegistry"
-  }
 }
