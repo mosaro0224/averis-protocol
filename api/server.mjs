@@ -1492,6 +1492,61 @@ app.post("/v2/passport/identity/prepare-mint", async (req, res) => {
   }
 });
 
+// POST /v2/passport/identity/confirm-mint
+// Called by agent after their mint tx confirms. Reads the tx receipt, extracts tokenId
+// from the Transfer event log, and saves the wallet→tokenId mapping in passport store.
+// This enables wallet-only identity lookup without needing to scan eth_getLogs.
+app.post("/v2/passport/identity/confirm-mint", async (req, res) => {
+  const { txHash, chainId, wallet } = req.body;
+  if (!txHash || !wallet) return res.status(400).json({ error: "txHash and wallet are required" });
+
+  const cid = Number(chainId) || 5042002;
+  const client = cid === 46630 ? getRhPassportClient() : publicClient;
+  const chainName = cid === 46630 ? "Robinhood Chain Testnet" : "Arc Testnet";
+
+  try {
+    const receipt = await client.getTransactionReceipt({ hash: txHash });
+    if (!receipt) return res.status(404).json({ error: "Transaction not found or not yet confirmed" });
+    if (receipt.status !== "success") return res.status(400).json({ error: "Transaction failed onchain" });
+
+    // Extract tokenId from Transfer event (topic[3])
+    const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+    let tokenId = null;
+    for (const log of receipt.logs) {
+      if (log.address.toLowerCase() === ERC8004_IDENTITY_REGISTRY.toLowerCase() &&
+          log.topics[0] === TRANSFER_TOPIC && log.topics.length >= 4) {
+        tokenId = Number(BigInt(log.topics[3]));
+        break;
+      }
+    }
+    if (tokenId === null) return res.status(400).json({ error: "No Transfer event found in tx receipt" });
+
+    // Save to passport store
+    passportStore.addIdentityLink(wallet, {
+      caip2: `eip155:${cid}`,
+      chainId: cid,
+      chainName,
+      tokenId,
+      txHash,
+      registryAddress: ERC8004_IDENTITY_REGISTRY,
+      confirmedAt: new Date().toISOString(),
+    });
+
+    return res.json({
+      confirmed: true,
+      wallet,
+      tokenId,
+      chainId: cid,
+      chainName,
+      txHash,
+      registryAddress: ERC8004_IDENTITY_REGISTRY,
+      message: `Identity token ${tokenId} confirmed for ${wallet} on ${chainName}. Wallet-only verify now works.`,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to confirm mint", detail: err.message });
+  }
+});
+
 // POST /v2/passport/identity/verify
 // Resolves the onchain identity for a wallet across Arc Testnet and Robinhood Chain Testnet.
 // Returns verified identity records, chain coverage, and passport store links.
@@ -1569,7 +1624,13 @@ app.post("/v2/passport/identity/verify", async (req, res) => {
         }
 
         if (tokenIds.length === 0) {
-          return { chainId: cid, chainName, caip2, verified: false, reason: "Balance is non-zero but no Transfer events found in recent blocks. Identity may be old." };
+          // Fall back to passport store (populated by confirm-mint)
+          const stored = passportStore.getIdentityLinks(wallet);
+          const link = stored?.find(l => l.caip2 === caip2);
+          if (link?.tokenId) tokenIds.push(link.tokenId);
+        }
+        if (tokenIds.length === 0) {
+          return { chainId: cid, chainName, caip2, verified: false, reason: "Balance is non-zero but tokenId not found. Call POST /v2/passport/identity/confirm-mint with your mint txHash to register." };
         }
 
         // Verify current ownership and get metadata for first token
