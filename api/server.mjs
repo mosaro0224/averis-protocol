@@ -1502,10 +1502,11 @@ app.post("/v2/passport/identity/verify", async (req, res) => {
     return res.status(400).json({ error: "wallet or agentId is required" });
   }
 
-  const OWNER_ABI = parseAbi([
+  const VERIFY_ABI = parseAbi([
     "function ownerOf(uint256 tokenId) view returns (address)",
     "function tokenURI(uint256 tokenId) view returns (string)",
-    "function totalSupply() view returns (uint256)",
+    "function balanceOf(address owner) view returns (uint256)",
+    "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   ]);
 
   const chains = chainId
@@ -1519,27 +1520,42 @@ app.post("/v2/passport/identity/verify", async (req, res) => {
 
     try {
       if (agentId !== undefined) {
-        // Resolve by agentId
+        // Resolve by specific tokenId
         const [owner, uri] = await Promise.all([
-          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "ownerOf", args: [BigInt(agentId)] }),
-          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "tokenURI", args: [BigInt(agentId)] }),
+          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "ownerOf", args: [BigInt(agentId)] }),
+          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "tokenURI", args: [BigInt(agentId)] }),
         ]);
         const matches = wallet ? owner.toLowerCase() === wallet.toLowerCase() : true;
-        return { chainId: cid, chainName, caip2, agentId: Number(agentId), wallet: owner, metadataURI: uri, verified: true, walletMatches: matches };
+        return { chainId: cid, chainName, caip2, tokenId: Number(agentId), wallet: owner, metadataURI: uri, verified: true, walletMatches: matches };
       } else {
-        // Scan by wallet — check if any token is owned by this wallet
-        // Best effort: try agentIds from store first, then report unresolved if none
-        const stored = passportStore.getIdentityLinks(wallet);
-        const link = stored?.find(l => l.caip2 === caip2);
-        if (link) {
-          const [owner, uri] = await Promise.all([
-            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "ownerOf", args: [BigInt(link.agentId)] }),
-            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: OWNER_ABI, functionName: "tokenURI", args: [BigInt(link.agentId)] }),
-          ]);
-          const matches = owner.toLowerCase() === wallet.toLowerCase();
-          return { chainId: cid, chainName, caip2, agentId: link.agentId, wallet: owner, metadataURI: uri, verified: matches, walletMatches: matches };
+        // Resolve by wallet — use ERC-721 enumerable to find all tokens owned by wallet
+        const balance = await client.readContract({
+          address: ERC8004_IDENTITY_REGISTRY,
+          abi: VERIFY_ABI,
+          functionName: "balanceOf",
+          args: [wallet],
+        });
+        if (Number(balance) === 0) {
+          return { chainId: cid, chainName, caip2, verified: false, reason: "No identity found for this wallet on this chain. Mint via POST /v2/passport/identity/prepare-mint" };
         }
-        return { chainId: cid, chainName, caip2, verified: false, reason: "No identity found for this wallet on this chain. Mint via POST /v2/passport/identity/prepare-mint" };
+        // Fetch all tokens owned by this wallet
+        const tokenIds = await Promise.all(
+          Array.from({ length: Number(balance) }, (_, i) =>
+            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "tokenOfOwnerByIndex", args: [wallet, BigInt(i)] })
+          )
+        );
+        // Get metadata for first token (primary identity)
+        const primaryTokenId = tokenIds[0];
+        const uri = await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "tokenURI", args: [primaryTokenId] });
+        return {
+          chainId: cid, chainName, caip2,
+          verified: true,
+          tokenId: Number(primaryTokenId),
+          tokenIds: tokenIds.map(Number),
+          wallet,
+          metadataURI: uri,
+          identityCount: Number(balance),
+        };
       }
     } catch {
       return { chainId: cid, chainName, caip2, verified: false, reason: "No identity registered on this chain" };
