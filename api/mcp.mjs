@@ -150,6 +150,58 @@ export const MCP_TOOLS = [
       required: ["jobId", "agentAddress", "nonce", "expiry", "signature"],
     },
   },
+
+  // ── Passport tools ─────────────────────────────────────────────────────
+  {
+    name: "averis_passport_verify_identity",
+    title: "Verify Agent Identity",
+    description: "Check whether an agent wallet has a registered ERC-8004 identity on Arc Testnet and/or Robinhood Chain Testnet. Returns per-chain identity records, a verified boolean, and verifiedChains array. No auth required — anyone can verify any wallet.",
+    requiresAuth: false,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: "object",
+      properties: {
+        wallet:  { type: "string",  description: "Agent wallet address (0x...)" },
+        agentId: { type: "integer", description: "ERC-8004 token ID (optional — provide wallet or agentId or both)" },
+        chainId: { type: "integer", description: "Specific chain to check: 5042002 (Arc) or 46630 (Robinhood). Omit to check both." },
+      },
+    },
+  },
+  {
+    name: "averis_passport_prepare_mint",
+    title: "Prepare Identity Mint Transaction",
+    description: "Get unsigned calldata to mint an ERC-8004 identity token on Arc Testnet or Robinhood Chain Testnet (or both). The API returns a ready-to-broadcast unsigned transaction. The agent signs it from their own wallet and broadcasts it — the API never holds a key. Call averis_passport_verify_identity first to confirm identity does not already exist.",
+    requiresAuth: false,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    inputSchema: {
+      type: "object",
+      properties: {
+        wallet:      { type: "string",  description: "Agent wallet address that will own the identity (0x...)" },
+        agentId:     { type: "integer", description: "ERC-8004 token ID to mint (must be unique on the target chain)" },
+        metadataURI: { type: "string",  description: "URI pointing to agent metadata JSON (IPFS link or HTTPS URL)" },
+        chainId:     { type: "integer", description: "Target chain: 5042002 (Arc Testnet) or 46630 (Robinhood Chain Testnet)" },
+      },
+      required: ["wallet", "agentId", "metadataURI", "chainId"],
+    },
+  },
+  {
+    name: "averis_passport_prepare_policy_commit",
+    title: "Prepare Policy Commit Transaction",
+    description: "Get unsigned calldata to commit a capability policy hash to AgentPolicyRegistry on Robinhood Chain Testnet (chain 46630). Returns a ready-to-broadcast unsigned transaction. The agent signs and broadcasts from their own wallet. Policy commitments are irreversible once confirmed onchain.",
+    requiresAuth: false,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    inputSchema: {
+      type: "object",
+      properties: {
+        wallet:         { type: "string",  description: "Agent wallet address (0x...)" },
+        agentId:        { type: "integer", description: "ERC-8004 token ID of the agent committing the policy" },
+        policyHash:     { type: "string",  description: "keccak256 hash of the policy document (bytes32, 0x-prefixed)" },
+        contentURIHash: { type: "string",  description: "keccak256 hash of the IPFS content URI (bytes32, 0x-prefixed, optional)" },
+        expiresAt:      { type: "integer", description: "Unix timestamp when policy expires (0 = no expiry)" },
+      },
+      required: ["wallet", "agentId", "policyHash"],
+    },
+  },
 ];
 
 // ── Auth verification (reused from server context) ────────────────────────
@@ -402,6 +454,44 @@ export async function handleMCP(req, res, ctx) {
             function:    "repayObligation(uint256 jobId)",
             args:        { jobId: args.jobId },
             position:    pos.data,
+          }));
+        }
+
+        case "averis_passport_verify_identity": {
+          const r = await ctx.post("/v2/passport/identity/verify", {
+            wallet:  args.wallet,
+            agentId: args.agentId,
+            chainId: args.chainId,
+          });
+          return res.json(r.ok ? mcpOk(r.data) : mcpErr(r.data?.error || "Failed to verify identity"));
+        }
+
+        case "averis_passport_prepare_mint": {
+          const r = await ctx.post("/v2/passport/identity/prepare-mint", {
+            wallet:      args.wallet,
+            agentId:     args.agentId,
+            metadataURI: args.metadataURI,
+            chainId:     args.chainId,
+          });
+          if (!r.ok) return res.json(mcpErr(r.data?.error || "Failed to prepare mint transaction"));
+          return res.json(mcpOk({
+            ...r.data,
+            instruction: "Sign and broadcast the returned transaction from your agent wallet to mint your ERC-8004 identity token.",
+          }));
+        }
+
+        case "averis_passport_prepare_policy_commit": {
+          const r = await ctx.post("/v2/passport/policy/prepare-commit", {
+            wallet:         args.wallet,
+            agentId:        args.agentId,
+            policyHash:     args.policyHash,
+            contentURIHash: args.contentURIHash,
+            expiresAt:      args.expiresAt ?? 0,
+          });
+          if (!r.ok) return res.json(mcpErr(r.data?.error || "Failed to prepare policy commit"));
+          return res.json(mcpOk({
+            ...r.data,
+            instruction: "Sign and broadcast the returned transaction from your agent wallet to commit this policy to AgentPolicyRegistry. WARNING: Policy commitments are irreversible once confirmed onchain.",
           }));
         }
 

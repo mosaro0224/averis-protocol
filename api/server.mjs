@@ -806,40 +806,106 @@ function buildDiscoveryDoc(liveParams) {
     protocol:       "Averis",
     version:        "2.0.0",
     status:         "testnet",
-    network_note:   "Currently live on Arc Testnet (chain 5042002). USDC on this network has no real-world value. Mainnet deployment is on the roadmap.",
-    description:    AGENT_CARD.description,
-    capabilities:   [...(AGENT_CARD.capabilities || []), "external_job_financing"],
-    keywords:       AGENT_CARD.keywords,
+    network_note:   "Averis Finance is live on Arc Testnet (chain 5042002). Averis Passport is live on Arc Testnet (5042002) and Robinhood Chain Testnet (46630). USDC on these networks has no real-world value. Mainnet deployment is on the roadmap.",
+    description:    "Averis is a two-product onchain protocol for autonomous AI agents. Averis Finance provides job-backed USDC working capital — agents draw a controlled spending pool against a funded job receivable. Averis Passport provides cross-chain agent identity and reputation — agents mint an ERC-8004 identity, commit capability policies, and accumulate verified economic receipts.",
+
+    products: {
+      finance: {
+        name:        "Averis Finance",
+        description: "Job-backed USDC working capital for autonomous agents. Draw up to 40% of a funded job budget as a controlled spending pool. Principal and fees repaid automatically at settlement.",
+        status:      "live",
+        chain:       "Arc Testnet (5042002)",
+        launch_url:  "https://averisprotocol.xyz/finance",
+        contracts:   CONTRACTS,
+        contractsReady: contractsDeployed(),
+        terms:       terms,
+        default_consequences: {
+          pool_frozen:          "The spending pool is frozen immediately — no further spending possible.",
+          unspent_returned:     "Any unspent capital in the pool is returned to the vault automatically.",
+          net_loss_written_off: "The net loss is written off against vault NAV. LP funds absorb the loss.",
+          agent_liability:      "Non-recourse. The agent is NOT personally liable to repay if the job fails.",
+        },
+        eligibility_requirements: AGENT_CARD.eligibility_requirements,
+        repayment:     AGENT_CARD.repayment,
+        agent_journey: AGENT_CARD.agent_journey,
+      },
+      passport: {
+        name:        "Averis Passport",
+        description: "Cross-chain agent identity and reputation layer. Mint a non-transferable ERC-8004 identity token, commit capability policies via EIP-712 signatures, and accumulate verified economic receipts. Readable by any counterparty, platform, or observer.",
+        status:      "live",
+        chains:      ["Arc Testnet (5042002)", "Robinhood Chain Testnet (46630)"],
+        launch_url:  "https://averisprotocol.xyz/passport",
+        contracts: {
+          IdentityRegistry:     "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+          ReputationRegistry:   "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+          ValidationRegistry:   "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
+          AgentPolicyRegistry:  process.env.PASSPORT_POLICY_REGISTRY  || "0xf7F47493E2f042a428a531724bE62854002979cA",
+          AgentReceiptRegistry: process.env.PASSPORT_RECEIPT_REGISTRY || "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18",
+        },
+        note: "ERC-8004 registry addresses are CREATE2-deterministic — same address on both chains.",
+        read_endpoints: [
+          "GET /v2/agents/:address/passport       — full passport summary",
+          "GET /v2/agents/:address/identity       — ERC-8004 identity across chains",
+          "GET /v2/agents/:address/capabilities   — declared capabilities",
+          "GET /v2/agents/:address/policies       — policy commitments",
+          "GET /v2/agents/:address/reputation     — reputation score and tier",
+          "GET /v2/agents/:address/risk           — risk profile and signals",
+          "GET /v2/agents/:address/transactions   — transaction history",
+          "GET /v2/agents/:address/counterparties — counterparty graph",
+          "GET /v2/agents/:address/agreements     — active agreements",
+          "GET /v2/agents/:address/receipts       — verified receipts",
+        ],
+        action_endpoints: [
+          "POST /v2/passport/identity/prepare-mint   — unsigned calldata to mint ERC-8004 identity (agent signs + broadcasts)",
+          "POST /v2/passport/identity/verify         — verify agent identity onchain across both chains",
+          "POST /v2/passport/policy/prepare-commit   — unsigned calldata to commit policy to AgentPolicyRegistry",
+        ],
+        agent_passport_journey: [
+          "1. POST /v2/passport/identity/verify       — check if identity already exists",
+          "2. POST /v2/passport/identity/prepare-mint — get unsigned calldata to mint",
+          "3. Sign and broadcast returned transaction from agent wallet",
+          "4. GET  /v2/agents/:address/identity       — confirm identity is live onchain",
+          "5. POST /v2/passport/policy/prepare-commit — commit a capability policy",
+          "6. GET  /v2/agents/:address/passport       — read full passport",
+        ],
+      },
+    },
+
+    // Legacy top-level fields kept for backward compatibility
+    capabilities:   [...(AGENT_CARD.capabilities || []), "external_job_financing", "agent_identity", "agent_passport", "erc8004_identity", "policy_commitments", "economic_receipts"],
+    keywords:       [...(AGENT_CARD.keywords || []), "passport", "identity", "reputation", "erc-8004", "policy", "receipts", "cross-chain identity"],
     chain:          AGENT_CARD.chain,
     contracts:      CONTRACTS,
     contractsReady: contractsDeployed(),
     protocol_terms: terms,
-    default_consequences: {
-      note: "What happens to the agent if a financed job fails, expires, or is rejected.",
-      pool_frozen:        "The spending pool is frozen immediately — no further spending possible.",
-      unspent_returned:   "Any unspent capital in the pool is returned to the vault automatically.",
-      net_loss_written_off: "The net loss (principal minus unspent) is written off against vault NAV (LP funds absorb the loss).",
-      agent_consequences: "In V2 there is no on-chain blacklist or automatic reputation penalty for defaults. The agent's exposure is released in AverisHood, allowing future financing applications. However, the protocol owner may manually set the agent's credit limit to zero via setCreditLimit().",
-      agent_liability:    "The agent is NOT personally liable to repay if the job fails. The financing is non-recourse — secured only by the job receivable.",
-    },
-    eligibility_requirements: AGENT_CARD.eligibility_requirements,
-    repayment:      AGENT_CARD.repayment,
     authentication: AGENT_CARD.authentication,
-    agent_journey:  AGENT_CARD.agent_journey,
     operator:       AGENT_CARD.operator,
     mcp: {
-      endpoint: `${AGENT_CARD.api.base_url}/v1/mcp`,
-      protocol: "MCP/1.0",
-      tools:    MCP_TOOLS.map((t) => ({
-        name:              t.name,
-        description:       t.description,
-        requiresAuth:      t.requiresAuth,
-        "x-requires-auth": t.requiresAuth,
-      })),
+      endpoint:      `${AGENT_CARD.api.base_url}/v1/mcp`,
+      endpoint_v2:   `${AGENT_CARD.api.base_url}/mcp`,
+      protocol:      "MCP/1.0",
+      tool_count:    MCP_TOOLS.length + MCP_PASSPORT_TOOLS.length,
+      tools: [
+        ...MCP_TOOLS.map((t) => ({
+          name:              t.name,
+          description:       t.description,
+          category:          "finance",
+          requiresAuth:      t.requiresAuth,
+          "x-requires-auth": t.requiresAuth,
+        })),
+        ...MCP_PASSPORT_TOOLS.map((t) => ({
+          name:              t.name,
+          description:       t.description,
+          category:          "passport",
+          requiresAuth:      false,
+          "x-requires-auth": false,
+        })),
+      ],
     },
     openapi:   `${AGENT_CARD.api.base_url}/openapi.json`,
     agentCard: `${AGENT_CARD.api.base_url}/.well-known/agent-card.json`,
     summary:   `${AGENT_CARD.api.base_url}/v1/summary`,
+    llms_txt:  `${AGENT_CARD.api.base_url}/llms.txt`,
   };
 }
 
@@ -867,13 +933,19 @@ app.get("/robots.txt", (_req, res) => {
     "User-agent: *",
     "Allow: /",
     "",
-    "# Averis Protocol — Working capital for autonomous AI agents",
+    "# Averis Protocol — Two-product onchain protocol for autonomous AI agents",
+    "# Products: Averis Finance (working capital) + Averis Passport (identity & reputation)",
     "# Agent discovery:   /.well-known/agent-card.json",
     "# API discovery:     /v1/discover",
     "# OpenAPI spec:      /openapi.json",
     "# MCP tools:         /v1/mcp",
+    "# LLM context:       /llms.txt",
+    "# Finance app:       https://averisprotocol.xyz/finance",
+    "# Passport app:      https://averisprotocol.xyz/passport",
     "# Keywords: agent working capital, agent financing, AI agent funding,",
-    "#           USDC financing, agentic finance, job-backed credit",
+    "#           USDC financing, agentic finance, job-backed credit,",
+    "#           agent identity, agent passport, ERC-8004, agent reputation,",
+    "#           cross-chain identity, policy commitments, economic receipts",
   ].join("\n"));
 });
 
@@ -978,14 +1050,8 @@ Mutating actions:    EIP-712 signature in X-Agent-Signature header.
 Domain: {name: "AverisProtocol", version: "2", chainId: 5042002}
 Type:   AgentRequest{agentAddress, nonce, expiry, chainId}
 
-IMPORTANT NOTES
----------------
-- TESTNET ONLY. Arc Testnet USDC has no real-world value.
-- Unaudited. Do not use with real funds until third-party audit is completed.
-- Vault currently holds ${tvl.toFixed(2)} USDC. Financing requires LP deposits.
-- Mainnet deployment is on the roadmap after audit and vault seeding.
-
-Contract addresses (current deployment — always current, pulled from env):
+FINANCE CONTRACT ADDRESSES (Arc Testnet 5042002)
+------------------------------------------------
   AverisVault:           ${CONTRACTS.vault       || "(not set)"}
   AverisFinancingV2:     ${CONTRACTS.financing   || "(not set)"}
   AverisACP:             ${CONTRACTS.acp         || "(not set)"}
@@ -994,7 +1060,83 @@ Contract addresses (current deployment — always current, pulled from env):
   AverisPoolFactory:     ${CONTRACTS.factory     || "(not set)"}
   AverisAdapterRegistry: ${CONTRACTS.registry    || "(not set)"}
   AverisCredit:          ${CONTRACTS.credit      || "(not set)"}
-Query GET /v1/discover for the full contract table including AverisReserve and AverisACPAdapter.
+
+===========================================================
+AVERIS PASSPORT — Cross-Chain Agent Identity & Reputation
+===========================================================
+Status:   LIVE on Arc Testnet (5042002) + Robinhood Chain Testnet (46630)
+App:      https://averisprotocol.xyz/passport
+
+WHAT PASSPORT DOES
+------------------
+Averis Passport is a non-custodial, cross-chain identity and reputation layer
+for autonomous agents. It is NOT a financing product — it is an identity and
+track-record layer that any agent, platform, or observer can read independently.
+
+- ERC-8004 Identity:   Non-transferable identity token. Links all activity to
+                       one verifiable wallet. Readable on both chains.
+- Policy Commitments:  Agents commit to capability policies using EIP-712
+                       signatures. Policies are versioned and revocable.
+                       Stored in AgentPolicyRegistry on Robinhood Chain Testnet.
+- Economic Receipts:   Append-only registry of verified economic activity.
+                       Three states: SELF_REPORTED, AVERIS_VERIFIED, EXTERNAL_ATTESTER.
+- Cross-chain:         Same identity readable on Arc Testnet and Robinhood Chain Testnet.
+                       CREATE2-deterministic registry addresses.
+
+PASSPORT CONTRACTS
+------------------
+  IdentityRegistry:     0x8004A818BFB912233c491871b3d84c89A494BD9e  (Arc + RH Testnet)
+  ReputationRegistry:   0x8004B663056A597Dffe9eCcC1965A193B7388713  (Arc + RH Testnet)
+  ValidationRegistry:   0x8004Cb1BF31DAf7788923b405b754f57acEB4272  (Arc + RH Testnet)
+  AgentPolicyRegistry:  ${process.env.PASSPORT_POLICY_REGISTRY  || "0xf7F47493E2f042a428a531724bE62854002979cA"}  (Robinhood Chain Testnet 46630)
+  AgentReceiptRegistry: ${process.env.PASSPORT_RECEIPT_REGISTRY || "0x3477e203fCFFbfe0E419E230d115d7C80A22BB18"}  (Robinhood Chain Testnet 46630)
+
+PASSPORT READ ENDPOINTS (no auth required)
+-------------------------------------------
+  GET /v2/agents/:address/passport       — full passport summary
+  GET /v2/agents/:address/identity       — ERC-8004 identity across chains
+  GET /v2/agents/:address/capabilities   — declared capabilities
+  GET /v2/agents/:address/policies       — policy commitments
+  GET /v2/agents/:address/reputation     — reputation score and tier
+  GET /v2/agents/:address/risk           — risk profile and signals
+  GET /v2/agents/:address/transactions   — transaction history
+  GET /v2/agents/:address/counterparties — counterparty graph
+  GET /v2/agents/:address/agreements     — active agreements
+  GET /v2/agents/:address/receipts       — verified receipts
+
+PASSPORT ACTION ENDPOINTS (agent signs + broadcasts — API never holds keys)
+----------------------------------------------------------------------------
+  POST /v2/passport/identity/prepare-mint    — unsigned calldata to mint ERC-8004 identity
+    Body: { wallet, agentId, metadataURI, chainId }
+    Returns: { transaction: { to, data, value, chainId }, registryAddress }
+
+  POST /v2/passport/identity/verify          — verify agent identity onchain
+    Body: { wallet } or { agentId } or { wallet, agentId, chainId }
+    Returns: { verified, verifiedChains, identities[] }
+
+  POST /v2/passport/policy/prepare-commit    — unsigned calldata to commit policy
+    Body: { wallet, agentId, policyHash, contentURIHash, expiresAt }
+    Returns: { transaction: { to, data, value, chainId: 46630 }, currentNonce, params }
+
+AGENT PASSPORT JOURNEY
+-----------------------
+  1. POST /v2/passport/identity/verify       — check if identity already exists
+  2. POST /v2/passport/identity/prepare-mint — get calldata to mint on Arc + RH Testnet
+  3. Sign and broadcast returned transaction from agent wallet
+  4. GET  /v2/agents/:address/identity       — confirm identity is live onchain
+  5. POST /v2/passport/policy/prepare-commit — commit a capability policy
+  6. GET  /v2/agents/:address/passport       — read full passport
+
+IMPORTANT NOTES
+---------------
+- TESTNET ONLY. USDC on these networks has no real-world value.
+- Unaudited. Do not use with real funds until third-party audit is completed.
+- Finance vault currently holds ${tvl.toFixed(2)} USDC. Financing requires LP deposits.
+- Mainnet deployment is on the roadmap after audit and vault seeding.
+- Full API reference: GET /v1/discover
+- OpenAPI spec:       GET /openapi.json
+- Agent card:         GET /.well-known/agent-card.json
+- LLMs context:       GET /llms.txt
 
 Generated: ${new Date().toISOString()}
 `.trim());

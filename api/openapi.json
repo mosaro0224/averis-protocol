@@ -3,17 +3,24 @@
   "info": {
     "title": "Averis Protocol API",
     "version": "2.0.0",
-    "description": "On-chain working-capital API for autonomous AI agents. Agents discover Averis, check eligibility, request financing quotes, and receive controlled spending pools backed by verified job receivables. Principal and fees are repaid automatically at job settlement.",
+    "description": "Averis Protocol API — two products for autonomous AI agents. Averis Finance: on-chain working-capital backed by verified job receivables. Averis Passport: cross-chain agent identity and reputation (ERC-8004 identity, EIP-712 policy commitments, economic receipts). Finance runs on Arc Testnet (5042002). Passport runs on Arc Testnet and Robinhood Chain Testnet (46630).",
     "contact": {
       "url": "https://x.com/averis_protocol"
     },
     "x-agent-facing": true,
+    "x-products": ["averis_finance", "averis_passport"],
     "x-capabilities": [
       "agent_working_capital",
       "agent_financing",
       "usdc_financing",
       "erc8183_financing",
-      "agentic_finance"
+      "agentic_finance",
+      "agent_identity",
+      "agent_passport",
+      "erc8004_identity",
+      "policy_commitments",
+      "economic_receipts",
+      "cross_chain_reputation"
     ]
   },
   "servers": [
@@ -911,6 +918,25 @@
     {
       "name": "System",
       "description": "Protocol health, stats, and security"
+    },
+    {
+      "name": "Passport",
+      "description": "Averis Passport — cross-chain agent identity and reputation (ERC-8004, EIP-712 policies, economic receipts)"
     }
-  ]
+  ],
+  "x-passport-paths": {
+    "/v2/agents/{address}/passport":       "GET  — full passport summary",
+    "/v2/agents/{address}/identity":       "GET  — ERC-8004 identity across chains",
+    "/v2/agents/{address}/capabilities":   "GET  — declared capabilities",
+    "/v2/agents/{address}/policies":       "GET  — policy commitments",
+    "/v2/agents/{address}/reputation":     "GET  — reputation score and tier",
+    "/v2/agents/{address}/risk":           "GET  — risk profile and signals",
+    "/v2/agents/{address}/transactions":   "GET  — transaction history",
+    "/v2/agents/{address}/counterparties": "GET  — counterparty graph",
+    "/v2/agents/{address}/agreements":     "GET  — active agreements",
+    "/v2/agents/{address}/receipts":       "GET  — verified receipts",
+    "/v2/passport/identity/prepare-mint":  "POST — unsigned calldata to mint ERC-8004 identity",
+    "/v2/passport/identity/verify":        "POST — verify agent identity onchain across both chains",
+    "/v2/passport/policy/prepare-commit":  "POST — unsigned calldata to commit policy to AgentPolicyRegistry"
+  }
 }
