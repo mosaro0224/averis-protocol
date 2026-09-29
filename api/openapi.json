@@ -1088,5 +1088,5 @@
       "name": "Passport",
       "description": "Averis Passport — cross-chain agent identity and reputation (ERC-8004, EIP-712 policies, economic receipts)"
     }
-  ],
+  ]
 }
