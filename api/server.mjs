@@ -1815,7 +1815,8 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     const deadline = BigInt(Math.floor(Date.now()/1000) + 86400 * 7);
     const jobHash = "0x" + "de".repeat(32);
 
-    const approveTx = await wc.writeContract({ address: CONTRACTS.usdc, abi: USDC_ABI, functionName: "approve", args: [CONTRACTS.acp, jobBudget * 100n] });
+    const USDC_ADDRESS = process.env.ARC_USDC || "0x3600000000000000000000000000000000000000";
+    const approveTx = await wc.writeContract({ address: USDC_ADDRESS, abi: USDC_ABI, functionName: "approve", args: [CONTRACTS.acp, jobBudget * 100n] });
     await waitTx(approveTx);
 
     const jobCount = await pc.readContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "jobCount" });
