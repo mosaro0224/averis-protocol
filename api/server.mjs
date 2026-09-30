@@ -1834,8 +1834,8 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
         const h = await wc.writeContract({ address: CONTRACTS.acp, abi: s.abi, functionName: "createJob", args: s.args, gas: 300000n });
         const r = await pc.waitForTransactionReceipt({ hash: h, timeout: 60000 });
         if (r.status === "success") { createTx = h; createRcpt = r; break; }
-        lastErr = `TX reverted with sig: ${JSON.stringify(s.args)}`;
-      } catch(e) { lastErr = e.message; }
+        lastErr = `TX reverted with sig index ${sigs.indexOf(s)}`;
+      } catch(e) { lastErr = (e.message || String(e)).split('\n')[0]; }
     }
     if (!createTx) throw new Error("createJob failed with all signatures. Last error: " + lastErr);
 
