@@ -1816,9 +1816,28 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     const jobBudget = 50_000_000n; // 50 USDC (6 decimals)
     const expiry = BigInt(Math.floor(Date.now()/1000) + 86400 * 7);
 
-    // 3a: create job (provider = test wallet, evaluator = test wallet for self-evaluation)
-    const createTx = await wc.writeContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "createJob", args: [WALLET, WALLET, expiry, "Averis test job", "0x0000000000000000000000000000000000000000"], gas: 300000n });
-    const createRcpt = await waitTx(createTx);
+    // 3a: create job — try multiple signatures since deployed bytecode may differ from current source
+    // Sig 1: createJob(address provider, address evaluator, uint64 expiry, string description, address hook)
+    // Sig 2: createJob(address provider, address evaluator, uint64 expiry, bytes32 descHash, address hook)
+    // Sig 3: createJob(address provider, address evaluator, uint256 budget, bytes32 jobHash)
+    let createTx, createRcpt;
+    const descHash = "0x" + "ab".repeat(31) + "cd";
+    const sigs = [
+      { abi: parseAbi(["function createJob(address,address,uint64,string,address) returns (uint256)"]), args: [WALLET, WALLET, expiry, "Averis test job", "0x0000000000000000000000000000000000000000"] },
+      { abi: parseAbi(["function createJob(address,address,uint64,bytes32,address) returns (uint256)"]), args: [WALLET, WALLET, expiry, descHash, "0x0000000000000000000000000000000000000000"] },
+      { abi: parseAbi(["function createJob(address,address,uint256,bytes32) returns (uint256)"]), args: [WALLET, WALLET, jobBudget, descHash] },
+      { abi: parseAbi(["function createJob(address,address,uint64,string) returns (uint256)"]), args: [WALLET, WALLET, expiry, "Averis test job"] },
+    ];
+    let lastErr;
+    for (const s of sigs) {
+      try {
+        const h = await wc.writeContract({ address: CONTRACTS.acp, abi: s.abi, functionName: "createJob", args: s.args, gas: 300000n });
+        const r = await pc.waitForTransactionReceipt({ hash: h, timeout: 60000 });
+        if (r.status === "success") { createTx = h; createRcpt = r; break; }
+        lastErr = `TX reverted with sig: ${JSON.stringify(s.args)}`;
+      } catch(e) { lastErr = e.message; }
+    }
+    if (!createTx) throw new Error("createJob failed with all signatures. Last error: " + lastErr);
 
     // Extract jobId from JobCreated event log
     let jobId = 0n;
