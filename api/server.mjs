@@ -1765,13 +1765,14 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
   }
   if (!requireContracts(res)) return;
 
-  const { createWalletClient, createPublicClient, http: viemHttp, parseAbi, encodeFunctionData } = await import("viem");
+  const { createWalletClient, createPublicClient, http: viemHttp, parseAbi, decodeEventLog } = await import("viem");
   const { privateKeyToAccount } = await import("viem/accounts");
 
   const PK = process.env.TEST_WALLET_PRIVATE_KEY;
   if (!PK) return res.status(400).json({ error: "TEST_WALLET_PRIVATE_KEY not set" });
 
   const WALLET = "0xd02Fe263b6F577b12558dA913027DC432f75CEb9";
+  const USDC_ADDRESS = process.env.ARC_USDC || "0x3600000000000000000000000000000000000000";
   const arcChain = { id: 5042002, name: "Arc Testnet", nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 }, rpcUrls: { default: { http: [process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io"] } } };
   const account = privateKeyToAccount(PK);
   const wc = createWalletClient({ account, chain: arcChain, transport: viemHttp(process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io") });
@@ -1783,10 +1784,14 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     return r;
   };
 
+  // Correct ACP ABI from source: AverisACP.sol
   const ACP_ABI = parseAbi([
-    "function createJob(address provider, address client, uint256 budget, uint256 deadline, bytes32 jobHash) returns (uint256)",
-    "function fundJob(uint256 jobId)",
-    "function jobCount() view returns (uint256)",
+    "function createJob(address provider, address evaluator, uint64 expiry, string description, address hook) returns (uint256 jobId)",
+    "function setPayoutReceiver(uint256 jobId, address receiver)",
+    "function setBudget(uint256 jobId, address token, uint128 amount, bytes calldata)",
+    "function fund(uint256 jobId, address expectedToken, uint128 expectedBudget, bytes calldata)",
+    "function getJob(uint256 jobId) view returns (address client, address provider, address evaluator, address token, address payoutReceiver, uint128 budget, uint128 funded, uint64 expiry, uint8 status)",
+    "event JobCreated(uint256 indexed jobId, address indexed client, address indexed provider)",
   ]);
   const USDC_ABI = parseAbi([
     "function approve(address spender, uint256 amount) returns (bool)",
@@ -1799,65 +1804,77 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
   const steps = [];
   try {
     // Step 1: vault state
-    const vault = await readContract(CONTRACTS.vault, parseAbi(["function totalAssets() view returns (uint256)", "function availableLiquidity() view returns (uint256)"]), "totalAssets");
-    steps.push({ step: 1, name: "Vault state", totalAssets: vault.toString() });
+    const totalAssets = await pc.readContract({ address: CONTRACTS.vault, abi: parseAbi(["function totalAssets() view returns (uint256)"]), functionName: "totalAssets" });
+    const available = await pc.readContract({ address: CONTRACTS.vault, abi: parseAbi(["function availableLiquidity() view returns (uint256)"]), functionName: "availableLiquidity" });
+    steps.push({ step: 1, name: "Vault state", totalAssets: totalAssets.toString(), available: available.toString() });
 
-    // Step 2: eligibility
-    const exposure = await readContract(CONTRACTS.hood, HOOD_ABI, "agentExposure", [WALLET]);
-    const protoMax = await readContract(CONTRACTS.financing, FINANCING_ABI, "protocolMaximum");
-    const creditLimit = await readContract(CONTRACTS.financing, FINANCING_ABI, "creditLimits", [WALLET]).catch(() => 0n);
-    const effectiveLimit = creditLimit > 0n ? creditLimit : protoMax;
-    const available = exposure < effectiveLimit ? effectiveLimit - exposure : 0n;
-    steps.push({ step: 2, name: "Eligibility", eligible: available > 0n, creditAvailable: available.toString() });
+    // Step 2: eligibility via API
+    const eligRes = await fetch(`http://localhost:${process.env.PORT || 3001}/v1/agents/${WALLET}/eligibility`).then(r => r.json());
+    steps.push({ step: 2, name: "Eligibility", eligible: eligRes.eligible, creditAvailable: eligRes.credit?.available_usdc });
 
-    // Step 3: approve + create + fund job
-    const jobBudget = 50_000_000n; // 50 USDC
-    const deadline = BigInt(Math.floor(Date.now()/1000) + 86400 * 7);
-    const jobHash = "0x" + "de".repeat(32);
+    // Step 3: create job on ACP (correct flow: create → setPayoutReceiver → setBudget → approve USDC → fund)
+    const jobBudget = 50_000_000n; // 50 USDC (6 decimals)
+    const expiry = BigInt(Math.floor(Date.now()/1000) + 86400 * 7);
 
-    const USDC_ADDRESS = process.env.ARC_USDC || "0x3600000000000000000000000000000000000000";
-    const approveTx = await wc.writeContract({ address: USDC_ADDRESS, abi: USDC_ABI, functionName: "approve", args: [CONTRACTS.acp, jobBudget * 100n] });
+    // 3a: create job (provider = test wallet, evaluator = test wallet for self-evaluation)
+    const createTx = await wc.writeContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "createJob", args: [WALLET, WALLET, expiry, "Averis test job", "0x0000000000000000000000000000000000000000"], gas: 300000n });
+    const createRcpt = await waitTx(createTx);
+
+    // Extract jobId from JobCreated event log
+    let jobId = 0n;
+    for (const log of createRcpt.logs) {
+      try {
+        const decoded = decodeEventLog({ abi: ACP_ABI, data: log.data, topics: log.topics });
+        if (decoded.eventName === "JobCreated") { jobId = decoded.args.jobId; break; }
+      } catch {}
+    }
+    if (!jobId) throw new Error("Could not extract jobId from JobCreated event");
+
+    // 3b: set payout receiver to ReceivableRouter BEFORE funding (establishes lien)
+    const lienTx = await wc.writeContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "setPayoutReceiver", args: [jobId, CONTRACTS.router], gas: 100000n });
+    await waitTx(lienTx);
+
+    // 3c: set budget
+    const setBudgetTx = await wc.writeContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "setBudget", args: [jobId, USDC_ADDRESS, jobBudget, "0x"], gas: 150000n });
+    await waitTx(setBudgetTx);
+
+    // 3d: approve USDC for ACP
+    const approveTx = await wc.writeContract({ address: USDC_ADDRESS, abi: USDC_ABI, functionName: "approve", args: [CONTRACTS.acp, jobBudget], gas: 100000n });
     await waitTx(approveTx);
 
-    const jobCount = await pc.readContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "jobCount" });
-    const createTx = await wc.writeContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "createJob", args: [WALLET, WALLET, jobBudget, deadline, jobHash] });
-    const createRcpt = await waitTx(createTx);
-    const newJobCount = await pc.readContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "jobCount" });
-    const jobId = newJobCount;
-
-    const fundTx = await wc.writeContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "fundJob", args: [jobId] });
+    // 3e: fund job
+    const fundTx = await wc.writeContract({ address: CONTRACTS.acp, abi: ACP_ABI, functionName: "fund", args: [jobId, USDC_ADDRESS, jobBudget, "0x"], gas: 200000n });
     await waitTx(fundTx);
-    steps.push({ step: 3, name: "Job created + funded", jobId: jobId.toString(), budget: jobBudget.toString(), createTx, fundTx });
 
-    // Step 4: verify job
-    const jobData = await readContract(CONTRACTS.acp, parseAbi(["function getJob(uint256) view returns (uint256,address,address,uint256,uint256,bytes32,uint8,address,uint64)"]), "getJob", [jobId]);
-    steps.push({ step: 4, name: "Job verified", jobId: jobId.toString(), status: jobData[6].toString() });
+    steps.push({ step: 3, name: "Job created + lien + funded", jobId: jobId.toString(), budget: jobBudget.toString(), createTx, lienTx, fundTx });
 
-    // Step 5: quote
-    const advanceRate = await readContract(CONTRACTS.financing, FINANCING_ABI, "advanceRateBps");
-    const drawAmount = (jobBudget * advanceRate) / 10000n;
-    const feeBps = await readContract(CONTRACTS.financing, FINANCING_ABI, "feeBps");
-    const repayment = drawAmount + (drawAmount * feeBps) / 10000n;
-    steps.push({ step: 5, name: "Quote", drawAmount: drawAmount.toString(), repayment: repayment.toString(), feeBps: feeBps.toString() });
+    // Step 4: verify job via API
+    const verifyRes = await fetch(`http://localhost:${process.env.PORT || 3001}/v2/jobs/verify`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ protocol: CONTRACTS.acp, jobId: jobId.toString(), agentAddress: WALLET }),
+    }).then(r => r.json());
+    steps.push({ step: 4, name: "Job verified", eligible: verifyRes.eligible, warnings: verifyRes.warnings, job: verifyRes.job });
 
-    // Step 6: draw
-    // Get termsHash from API quote endpoint
+    // Step 5: quote via API
+    const drawAmount = jobBudget * 4000n / 10000n; // 40% advance
     const quoteRes = await fetch(`http://localhost:${process.env.PORT || 3001}/v2/credit/quote`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobId: jobId.toString(), amount: drawAmount.toString(), adapter: CONTRACTS.acp }),
+      body: JSON.stringify({ agentAddress: WALLET, protocol: CONTRACTS.acp, jobId: jobId.toString(), requestedAmount: drawAmount.toString() }),
     }).then(r => r.json());
     const termsHash = quoteRes.termsHash || quoteRes.terms_hash;
     if (!termsHash) throw new Error("No termsHash from quote: " + JSON.stringify(quoteRes));
+    steps.push({ step: 5, name: "Quote", drawAmount: drawAmount.toString(), repayment: quoteRes.totalRepayment || quoteRes.total_repayment, termsHash });
 
-    const drawTx = await wc.writeContract({ address: CONTRACTS.financing, abi: FINANCING_ABI_LOCAL, functionName: "draw", args: [jobId, drawAmount, CONTRACTS.acp, termsHash], gas: 500000n });
-    await waitTx(drawTx);
-    steps.push({ step: 6, name: "Draw confirmed", drawTx, drawAmount: drawAmount.toString() });
+    // Step 6: draw onchain
+    const drawTx = await wc.writeContract({ address: CONTRACTS.financing, abi: FINANCING_ABI_LOCAL, functionName: "draw", args: [jobId, drawAmount, CONTRACTS.acp, termsHash], gas: 600000n });
+    const drawRcpt = await waitTx(drawTx);
+    steps.push({ step: 6, name: "Draw confirmed", drawTx, drawAmount: drawAmount.toString(), gasUsed: drawRcpt.gasUsed.toString() });
 
-    // Step 7: position
+    // Step 7: position via API
     const posRes = await fetch(`http://localhost:${process.env.PORT || 3001}/v2/positions/${jobId}`).then(r => r.json());
-    steps.push({ step: 7, name: "Position", position: posRes });
+    steps.push({ step: 7, name: "Position", poolAddress: posRes.poolAddress, status: posRes.status, principal: posRes.principal });
 
-    res.json({ success: true, steps, summary: { jobId: jobId.toString(), drawAmount: drawAmount.toString(), drawTx } });
+    res.json({ success: true, steps, summary: { jobId: jobId.toString(), drawAmount: drawAmount.toString(), drawTx, poolAddress: posRes.poolAddress } });
   } catch (err) {
     res.status(500).json({ success: false, steps, error: err.message });
   }
