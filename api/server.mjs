@@ -1821,12 +1821,13 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     const eligRes = await fetch(`http://localhost:${process.env.PORT || 3001}/v1/agents/${PROVIDER}/eligibility`).then(r => r.json());
     steps.push({ step: 2, name: "Eligibility", eligible: eligRes.eligible, creditAvailable: eligRes.credit?.available_usdc, provider: PROVIDER, client: CLIENT });
 
-    // Step 2b: fund CLIENT wallet with USDC for job budget (transfer from PROVIDER)
-    const jobBudget = 20_000_000n; // 20 USDC (6 decimals) — small enough given vault liquidity
-    const transferAbi = parseAbi(["function transfer(address to, uint256 amount) returns (bool)"]);
-    const fundClientTx = await wc.writeContract({ address: USDC_ADDRESS, abi: transferAbi, functionName: "transfer", args: [CLIENT, jobBudget + 1_000_000n], gas: 100000n });
+    // Step 2b: fund CLIENT wallet with USDC for job budget
+    // On Arc, USDC is native — use sendTransaction with value (native transfer, 18 decimals)
+    const jobBudget = 20_000_000n; // 20 USDC (6 decimals) for ERC-20 amounts
+    const nativeAmount = jobBudget * 1_000_000_000_000n; // convert 6-decimal to 18-decimal native
+    const fundClientTx = await wc.sendTransaction({ to: CLIENT, value: nativeAmount + 1_000_000_000_000_000_000n, gas: 21000n }); // +1 native USDC for gas
     await waitTx(fundClientTx);
-    steps.push({ step: "2b", name: "Funded client wallet", client: CLIENT, amount: (jobBudget + 1_000_000n).toString() });
+    steps.push({ step: "2b", name: "Funded client wallet", client: CLIENT, nativeAmount: nativeAmount.toString() });
 
     // Step 3: create job on ACP
     // CLIENT creates job with PROVIDER as the agent/provider, EVALUATOR = Hood contract
