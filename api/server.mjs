@@ -1829,27 +1829,22 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     await waitTx(fundClientTx);
     steps.push({ step: "2b", name: "Funded client wallet", client: CLIENT, nativeAmount: nativeAmount.toString() });
 
+    // Small delay to let Arc index the native transfer before using client wallet
+    await new Promise(r => setTimeout(r, 3000));
+
     // Step 3: create job on ACP
     // CLIENT creates job with PROVIDER as the agent/provider, EVALUATOR = Hood contract
     // Flow: createJob (client) → setPayoutReceiver (provider) → setBudget (provider) → approve+fund (client)
     const expiry = BigInt(Math.floor(Date.now()/1000) + 86400 * 7);
-    let createTx, createRcpt;
-    const descHash = "0x" + "ab".repeat(31) + "cd";
-    const sigs = [
-      { abi: parseAbi(["function createJob(address,address,uint64,string,address) returns (uint256)"]), args: [PROVIDER, EVALUATOR, expiry, "Averis draw test", "0x0000000000000000000000000000000000000000"] },
-      { abi: parseAbi(["function createJob(address,address,uint64,bytes32,address) returns (uint256)"]), args: [PROVIDER, EVALUATOR, expiry, descHash, "0x0000000000000000000000000000000000000000"] },
-    ];
-    let lastErr;
-    for (const s of sigs) {
-      try {
-        // CLIENT creates the job
-        const h = await wc2.writeContract({ address: CONTRACTS.acp, abi: s.abi, functionName: "createJob", args: s.args, gas: 300000n });
-        const r = await pc.waitForTransactionReceipt({ hash: h, timeout: 60000 });
-        if (r.status === "success") { createTx = h; createRcpt = r; break; }
-        lastErr = `TX reverted with sig index ${sigs.indexOf(s)}`;
-      } catch(e) { lastErr = (e.message || String(e)).split('\n')[0]; }
-    }
-    if (!createTx) throw new Error("createJob failed. Last error: " + lastErr);
+    // Simulation confirmed sig: createJob(address,address,uint64,string,address)
+    const createJobAbi = parseAbi(["function createJob(address,address,uint64,string,address) returns (uint256)"]);
+    const createHash = await wc2.writeContract({
+      address: CONTRACTS.acp, abi: createJobAbi, functionName: "createJob",
+      args: [PROVIDER, EVALUATOR, expiry, "Averis draw test", "0x0000000000000000000000000000000000000000"],
+      gas: 300000n
+    });
+    const createRcpt = await waitTx(createHash);
+    const createTx = createHash;
 
     // Extract jobId from JobCreated event log
     let jobId = 0n;
