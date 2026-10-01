@@ -1376,9 +1376,9 @@ async function resolveWalletIdentity(wallet, chainIds = [5042002, 46630]) {
         try {
           // Get totalSupply to bound the search, or probe last 500 tokenIds
           const PROBE_ABI = parseAbi(["function totalSupply() view returns (uint256)"]);
-          let topId = 1000;
+          let topId = 200;
           try { topId = Number(await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: PROBE_ABI, functionName: "totalSupply" })); } catch {}
-          const start = Math.max(1, topId - 200);
+          const start = 1;
           const probes = [];
           for (let tid = start; tid <= topId; tid++) probes.push(tid);
           const results2 = await Promise.allSettled(probes.map(tid =>
