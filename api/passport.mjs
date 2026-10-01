@@ -20,14 +20,14 @@ import * as store from "./passport-store.mjs";
 
 const POLICY_REGISTRY_ABI = parseAbi([
   "function getAgentPolicies(address agentWallet) external view returns (uint256[])",
-  "function policies(uint256 policyId) view returns (uint256 policyId, uint256 version, address agentWallet, uint256 agentId, address identityRegistry, bytes32 policyHash, bytes32 contentURI, uint64 createdAt, uint64 updatedAt, uint64 expiresAt, bool revoked)",
+  "function getPolicy(uint256 policyId) view returns (uint256 policyId, uint256 version, address agentWallet, uint256 agentId, address identityRegistry, bytes32 policyHash, bytes32 contentURI, uint64 createdAt, uint64 updatedAt, uint64 expiresAt, bool revoked)",
   "function nonces(address agentWallet) view returns (uint256)",
 ]);
 
 const RECEIPT_REGISTRY_ABI = parseAbi([
-  "function getReceipts(address agentWallet) view returns (uint256[])",
-  "function receipts(uint256 receiptId) view returns (uint256 receiptId, address agentWallet, uint256 agentId, bytes32 txHash, bytes32 evidenceHash, uint8 receiptType, uint64 anchoredAt, address issuer, uint8 verificationState)",
-  "function totalReceipts() view returns (uint256)",
+  "function getAgentReceipts(address agentWallet) view returns (uint256[])",
+  "function getReceipt(uint256 receiptId) view returns (uint256 receiptId, address agentWallet, uint256 agentId, bytes32 txHash, bytes32 evidenceHash, uint8 receiptType, uint64 anchoredAt, address issuer, uint8 verificationState)",
+  "function getReceiptCount(address agentWallet) view returns (uint256)",
 ]);
 
 const IDENTITY_ABI = parseAbi([
@@ -97,6 +97,39 @@ export async function getIdentity(wallet) {
   const links = store.getIdentityLinks(wallet);
   const adapters = getAllAdapters();
 
+  // For any adapter without a stored link, try scanning onchain via balanceOf + Registered events
+  const IDENTITY_FULL_ABI = parseAbi([
+    "function balanceOf(address owner) view returns (uint256)",
+    "event Registered(uint256 indexed agentId, address indexed wallet, string metadataURI)",
+  ]);
+  await Promise.all(adapters.map(async adapter => {
+    if (links.find(l => l.caip2 === adapter.caip2)) return; // already stored
+    try {
+      // Use the adapter's client via its chain config
+      const registryAddr = adapter.identityRegistry;
+      if (!registryAddr) return;
+      // Scan last 200k blocks for Registered events for this wallet
+      let client;
+      if (adapter.caip2 === "eip155:5042002") client = getArcClient();
+      else if (adapter.caip2 === "eip155:46630") client = getRhClient();
+      else return;
+      const latest = await client.getBlockNumber();
+      const from = latest > 200000n ? latest - 200000n : 0n;
+      const logs = await client.getLogs({
+        address: registryAddr,
+        event: parseAbi(["event Registered(uint256 indexed agentId, address indexed wallet, string metadataURI)"])[0],
+        args: { wallet: wallet },
+        fromBlock: from,
+        toBlock: latest,
+      }).catch(() => []);
+      for (const log of logs) {
+        const agentId = Number(log.args.agentId);
+        store.addIdentityLink(wallet, { agentId, caip2: adapter.caip2, metadataURI: log.args.metadataURI });
+        links.push({ agentId, caip2: adapter.caip2 });
+      }
+    } catch { /* silent fallback */ }
+  }));
+
   // Resolve each stored link via live chain adapter
   const resolvedLinks = await Promise.all(
     adapters.map(async adapter => {
@@ -156,25 +189,41 @@ export async function getPolicies(wallet) {
       policyIds.map(id => client.readContract({
         address: policyRegistry,
         abi: POLICY_REGISTRY_ABI,
-        functionName: "policies",
+        functionName: "getPolicy",
         args: [id],
       }))
     );
 
-    const policies = policiesRaw.map(p => ({
-      policyId:        Number(p.policyId),
-      version:         Number(p.version),
-      agentWallet:     p.agentWallet,
-      agentId:         Number(p.agentId),
-      identityRegistry: p.identityRegistry,
-      policyHash:      p.policyHash,
-      contentURIHash:  p.contentURI,
-      createdAt:       Number(p.createdAt),
-      updatedAt:       Number(p.updatedAt),
-      expiresAt:       Number(p.expiresAt),
-      revoked:         p.revoked,
-      active:          !p.revoked && (p.expiresAt === 0n || p.expiresAt > BigInt(Math.floor(Date.now() / 1000))),
-    }));
+    // viem returns named-tuple fields when using parseAbi with named params
+    const policies = policiesRaw.map(p => {
+      // Handle both array-style and named-style returns
+      const policyId   = p.policyId   ?? p[0];
+      const version    = p.version    ?? p[1];
+      const agentWallet = p.agentWallet ?? p[2];
+      const agentId    = p.agentId    ?? p[3];
+      const identityRegistry = p.identityRegistry ?? p[4];
+      const policyHash = p.policyHash ?? p[5];
+      const contentURI = p.contentURI ?? p[6];
+      const createdAt  = p.createdAt  ?? p[7];
+      const updatedAt  = p.updatedAt  ?? p[8];
+      const expiresAt  = p.expiresAt  ?? p[9];
+      const revoked    = p.revoked    ?? p[10];
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      return {
+        policyId:        policyId ? Number(policyId) : null,
+        version:         version ? Number(version) : null,
+        agentWallet,
+        agentId:         agentId ? Number(agentId) : null,
+        identityRegistry,
+        policyHash,
+        contentURIHash:  contentURI,
+        createdAt:       createdAt ? Number(createdAt) : null,
+        updatedAt:       updatedAt ? Number(updatedAt) : null,
+        expiresAt:       expiresAt ? Number(expiresAt) : null,
+        revoked:         Boolean(revoked),
+        active:          !revoked && (!expiresAt || expiresAt === 0n || expiresAt > now),
+      };
+    });
 
     return { policies, nonce: Number(nonce) };
   } catch (err) {
@@ -199,7 +248,7 @@ export async function getReceipts(wallet) {
       receiptIds = await client.readContract({
         address: receiptRegistry,
         abi: RECEIPT_REGISTRY_ABI,
-        functionName: "getReceipts",
+        functionName: "getAgentReceipts",
         args: [wallet],
       });
     } catch {
@@ -210,24 +259,35 @@ export async function getReceipts(wallet) {
       receiptIds.map(id => client.readContract({
         address: receiptRegistry,
         abi: RECEIPT_REGISTRY_ABI,
-        functionName: "receipts",
+        functionName: "getReceipt",
         args: [id],
       }))
     );
 
-    const receipts = onchain.map(r => ({
-      receiptId:         Number(r.receiptId),
-      agentWallet:       r.agentWallet,
-      agentId:           Number(r.agentId),
-      txHash:            r.txHash,
-      evidenceHash:      r.evidenceHash,
-      receiptType:       receiptTypeName(Number(r.receiptType)),
-      anchoredAt:        Number(r.anchoredAt),
-      issuer:            r.issuer,
-      verificationState: verificationStateName(Number(r.verificationState)),
-      // Merge offchain metadata if available
-      meta: meta.find(m => m.receiptId === Number(r.receiptId)) ?? null,
-    }));
+    const receipts = onchain.map(r => {
+      // Handle both named and positional returns
+      const receiptId        = r.receiptId        ?? r[0];
+      const agentWallet      = r.agentWallet      ?? r[1];
+      const agentId          = r.agentId          ?? r[2];
+      const txHash           = r.txHash           ?? r[3];
+      const evidenceHash     = r.evidenceHash     ?? r[4];
+      const receiptType      = r.receiptType      ?? r[5];
+      const anchoredAt       = r.anchoredAt       ?? r[6];
+      const issuer           = r.issuer           ?? r[7];
+      const verificationStateVal = r.verificationState ?? r[8];
+      return {
+        receiptId:         receiptId ? Number(receiptId) : null,
+        agentWallet,
+        agentId:           agentId ? Number(agentId) : null,
+        txHash,
+        evidenceHash,
+        receiptType:       receiptTypeName(Number(receiptType ?? 0)),
+        anchoredAt:        anchoredAt ? Number(anchoredAt) : null,
+        issuer,
+        verificationState: verificationStateName(Number(verificationStateVal ?? 0)),
+        meta: meta.find(m => m.receiptId === Number(receiptId)) ?? null,
+      };
+    });
 
     return { onchain: receipts, offchain: meta };
   } catch (err) {

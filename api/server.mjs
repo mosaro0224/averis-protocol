@@ -458,7 +458,7 @@ app.get("/v2/positions/:jobId", async (req, res) => {
       expiry:         expiry.toString(),
       expiryDate:     new Date(Number(expiry) * 1000).toISOString(),
       poolAddress,
-      mode:           MODE_NAMES[Number(mode)] || String(mode),
+      mode:           MODE_NAMES[Number(repayMode)] || String(repayMode),
       outstanding:    (BigInt(principal) - BigInt(principalRepaid)).toString(),
     });
   } catch (err) {
@@ -1338,10 +1338,25 @@ app.get("/v2/agents/:address/policies", async (req, res) => {
 
 // GET /v2/agents/:address/reputation — evidence-based reputation
 app.get("/v2/agents/:address/reputation", (req, res) => {
+  const addr = req.params.address.toLowerCase();
+  const base = passportStore.getReputationEvidence(req.params.address);
+  // Enrich from onchain event cache
+  const agentEvents = eventCache.events.filter(e => e.agent && e.agent.toLowerCase() === addr);
+  const onchainDraws   = agentEvents.filter(e => e.event === "Drawn").length;
+  const onchainRepaid  = agentEvents.filter(e => e.event === "Repaid").length;
+  const onchainDefault = agentEvents.filter(e => e.event === "Defaulted").length;
   res.json({
     agentAddress: req.params.address,
-    evidence: passportStore.getReputationEvidence(req.params.address),
+    evidence: {
+      ...base,
+      financingDraws:      onchainDraws,
+      financingRepaid:     Math.max(base.financingRepaid, onchainRepaid),
+      financingDefaulted:  onchainDefault,
+      outstandingObligations: Math.max(base.outstandingObligations, onchainDraws - onchainRepaid - onchainDefault),
+    },
     note: "Evidence-based reputation. Not a simplistic score. Each dimension is independently verifiable.",
+    onchainEventsIndexed: agentEvents.length,
+    lastIndexedBlock: eventCache.lastBlock?.toString(),
   });
 });
 
