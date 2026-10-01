@@ -1,7 +1,6 @@
-import { useAccount, useReadContract } from 'wagmi'
-import { formatUnits } from 'viem'
-import { CONTRACTS, USDC_DECIMALS, API_BASE } from '../../lib/constants'
-import { HOOD_ABI } from '../../lib/abis'
+import { useAccount } from 'wagmi'
+import { useState, useEffect } from 'react'
+import { API_BASE } from '../../lib/constants'
 
 const LIFECYCLE = [
   { step: '01', label: 'REGISTER', desc: 'Present your agent wallet address to the protocol.' },
@@ -14,10 +13,15 @@ const LIFECYCLE = [
 
 export function Agents() {
   const { address } = useAccount()
-  const { data: creditLimit } = useReadContract({ address: CONTRACTS.hood, abi: HOOD_ABI, functionName: 'creditLimit', args: address ? [address] : undefined, query: { enabled: !!address } })
-  const { data: agentTier }   = useReadContract({ address: CONTRACTS.hood, abi: HOOD_ABI, functionName: 'agentTier',   args: address ? [address] : undefined, query: { enabled: !!address } })
+  const [elig, setElig] = useState<any>(null)
 
-  const fmt = (v: bigint | undefined) => v !== undefined ? `$${parseFloat(formatUnits(v, USDC_DECIMALS)).toFixed(2)}` : '—'
+  useEffect(() => {
+    if (!address) return
+    fetch(`${API_BASE}/v1/agents/${address}/eligibility`)
+      .then(r => r.json())
+      .then(setElig)
+      .catch(() => null)
+  }, [address])
 
   return (
     <div className="w-full px-8 py-8 space-y-8">
@@ -37,12 +41,26 @@ export function Agents() {
           <div className="grid grid-cols-2 gap-3 mt-3">
             <div className="bg-averis-bg p-3">
               <div className="font-mono text-[9px] text-averis-muted mb-1">CREDIT LIMIT</div>
-              <div className="font-display text-[18px] font-semibold text-averis-text">{fmt(creditLimit)}</div>
+              <div className="font-display text-[18px] font-semibold text-averis-text">
+                {elig ? `$${Number(elig.creditLimit ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+              </div>
             </div>
             <div className="bg-averis-bg p-3">
-              <div className="font-mono text-[9px] text-averis-muted mb-1">TIER</div>
+              <div className="font-mono text-[9px] text-averis-muted mb-1">ELIGIBLE</div>
               <div className="font-display text-[18px] font-semibold text-averis-text">
-                {agentTier !== undefined ? `Tier ${agentTier}` : '—'}
+                {elig ? (elig.eligible ? <span className="text-emerald-400">YES</span> : <span className="text-red-400">NO</span>) : '—'}
+              </div>
+            </div>
+            <div className="bg-averis-bg p-3">
+              <div className="font-mono text-[9px] text-averis-muted mb-1">ACTIVE POSITIONS</div>
+              <div className="font-display text-[18px] font-semibold text-averis-text">
+                {elig ? `${elig.activePositions ?? 0} / ${elig.maxPositions ?? 5}` : '—'}
+              </div>
+            </div>
+            <div className="bg-averis-bg p-3">
+              <div className="font-mono text-[9px] text-averis-muted mb-1">AVAILABLE CREDIT</div>
+              <div className="font-display text-[18px] font-semibold text-averis-text">
+                {elig ? `$${Number(elig.availableCredit ?? elig.creditLimit ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
               </div>
             </div>
           </div>
