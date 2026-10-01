@@ -2049,12 +2049,13 @@ app.use((req, res) => {
 // Refreshes every 5 minutes. Exposes GET /v1/activity.
 
 const EVENT_ABI = parseAbi([
-  "event Drawn(address indexed agent, uint256 indexed jobId, uint256 amount, address pool)",
-  "event Repaid(address indexed agent, uint256 indexed jobId, uint256 principal, uint256 fee)",
-  "event Defaulted(address indexed agent, uint256 indexed jobId, uint256 loss)",
+  "event Drawn(uint256 indexed jobId, address indexed agent, uint256 principal, uint256 fee, address pool, uint8 tier, uint8 repayMode)",
+  "event Repaid(uint256 indexed jobId, uint256 principal, uint256 fee)",
+  "event Defaulted(uint256 indexed jobId, uint8 status, uint256 principalLoss)",
 ]);
 
 let eventCache = { events: [], lastBlock: 0n, updatedAt: null };
+const jobAgentMap = {}; // jobId -> agent address (populated from Drawn events)
 
 async function refreshEventIndex() {
   try {
@@ -2075,11 +2076,15 @@ async function refreshEventIndex() {
         toBlock: to,
       });
       for (const log of logs) {
+        const jobIdStr = log.args.jobId?.toString();
+        // Track agent by jobId from Drawn events
+        if (log.eventName === "Drawn" && log.args.agent) jobAgentMap[jobIdStr] = log.args.agent;
+        const agent = log.args.agent ?? jobAgentMap[jobIdStr] ?? null;
         newEvents.push({
           event:   log.eventName,
-          agent:   log.args.agent,
-          jobId:   log.args.jobId?.toString(),
-          amount:  (log.args.amount ?? log.args.principal ?? log.args.loss ?? 0n).toString(),
+          agent,
+          jobId:   jobIdStr,
+          amount:  (log.args.principal ?? log.args.principalLoss ?? 0n).toString(),
           fee:     log.args.fee?.toString() ?? "0",
           pool:    log.args.pool ?? null,
           block:   log.blockNumber?.toString(),
