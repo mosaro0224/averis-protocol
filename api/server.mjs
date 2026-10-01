@@ -1541,6 +1541,18 @@ app.post("/v2/passport/identity/prepare-mint", async (req, res) => {
   }
 });
 
+// POST /v2/passport/identity/register-token — lightweight alias for identity/link
+// Body: { wallet, tokenId, chainId }
+app.post("/v2/passport/identity/register-token", (req, res) => {
+  const { wallet, tokenId, chainId } = req.body || {};
+  if (!wallet || !tokenId || !chainId) return res.status(400).json({ error: "wallet, tokenId, and chainId are required" });
+  const CAIP2_MAP = { 5042002: "eip155:5042002", 46630: "eip155:46630" };
+  const caip2 = CAIP2_MAP[Number(chainId)];
+  if (!caip2) return res.status(400).json({ error: "unsupported chainId — use 5042002 (Arc Testnet) or 46630 (RH Testnet)" });
+  passportStore.addIdentityLink(wallet, { agentId: Number(tokenId), caip2 });
+  res.json({ ok: true, wallet, tokenId: Number(tokenId), chainId: Number(chainId), caip2 });
+});
+
 // POST /v2/passport/identity/confirm-mint
 // Called by agent after their mint tx confirms. Reads the tx receipt, extracts tokenId
 // from the Transfer event log, and saves the wallet→tokenId mapping in passport store.
@@ -1570,9 +1582,10 @@ app.post("/v2/passport/identity/confirm-mint", async (req, res) => {
     }
     if (tokenId === null) return res.status(400).json({ error: "No Transfer event found in tx receipt" });
 
-    // Save to passport store
+    // Save to passport store (agentId = tokenId for ERC-8004)
     passportStore.addIdentityLink(wallet, {
       caip2: `eip155:${cid}`,
+      agentId: tokenId,
       chainId: cid,
       chainName,
       tokenId,
