@@ -1902,7 +1902,7 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     const drawTx = await wc.writeContract({
       address: CONTRACTS.financing, abi: FINANCING_ABI_LOCAL, functionName: "draw",
       args: [CONTRACTS.acp, 0n, jobId, BigInt(drawAmount), "0x", []],
-      gas: 1000000n
+      gas: 3000000n
     });
     const drawRcpt = await waitTx(drawTx);
     steps.push({ step: 6, name: "Draw confirmed", drawTx, drawAmount: drawAmount.toString(), gasUsed: drawRcpt.gasUsed.toString() });
