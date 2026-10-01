@@ -1311,10 +1311,92 @@ app.get("/v2/agents/:address/economic-profile", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Shared helper: resolve onchain identity for a wallet across Arc + RH Testnet
+// Reused by GET /v2/agents/:address/identity and POST /v2/passport/identity/verify
+async function resolveWalletIdentity(wallet, chainIds = [5042002, 46630]) {
+  const VERIFY_ABI = parseAbi([
+    "function ownerOf(uint256 tokenId) view returns (address)",
+    "function tokenURI(uint256 tokenId) view returns (string)",
+    "function balanceOf(address owner) view returns (uint256)",
+  ]);
+  const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+  const results = await Promise.all(chainIds.map(async (cid) => {
+    const client   = cid === 46630 ? getRhPassportClient() : publicClient;
+    const chainName = cid === 46630 ? "Robinhood Chain Testnet" : "Arc Testnet";
+    const caip2    = `eip155:${cid}`;
+    const rpcUrl   = cid === 46630
+      ? (process.env.RH_TESTNET_RPC || "https://rpc.testnet.chain.robinhood.com")
+      : (process.env.ARC_RPC_URL    || "https://rpc.testnet.arc.io");
+    try {
+      const balance = await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "balanceOf", args: [wallet] });
+      if (Number(balance) === 0) return { chainId: cid, chainName, caip2, verified: false, reason: "No identity found" };
+
+      // Try passport store first (populated by confirm-mint)
+      let tokenIds = [];
+      const stored = passportStore.getIdentityLinks(wallet);
+      const storeLinks = (stored || []).filter(l => l.caip2 === caip2);
+      for (const l of storeLinks) { if (l.tokenId && !tokenIds.includes(l.tokenId)) tokenIds.push(l.tokenId); }
+
+      // If store empty, scan Transfer events in batches
+      if (tokenIds.length === 0) {
+        const latestHex = await fetch(rpcUrl, { method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({jsonrpc:"2.0",method:"eth_blockNumber",params:[],id:1}) }).then(r=>r.json()).then(r=>r.result);
+        const latest = parseInt(latestHex, 16);
+        const BATCH = 4999;
+        const walletPadded = "0x" + "0".repeat(24) + wallet.slice(2).toLowerCase();
+        for (let end = latest; end > Math.max(0, latest - 2000000) && tokenIds.length < 20; end -= BATCH) {
+          const from = Math.max(0, end - BATCH);
+          const logsRes = await fetch(rpcUrl, { method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({jsonrpc:"2.0",method:"eth_getLogs",id:1,params:[{address:ERC8004_IDENTITY_REGISTRY,
+              topics:[TRANSFER_TOPIC,null,walletPadded],fromBlock:"0x"+from.toString(16),toBlock:"0x"+end.toString(16)}]}) }).then(r=>r.json());
+          for (const log of (logsRes.result||[])) { const tid=parseInt(log.topics[3],16); if(!tokenIds.includes(tid)) tokenIds.push(tid); }
+          if (tokenIds.length >= Number(balance)) break;
+        }
+      }
+
+      if (tokenIds.length === 0) return { chainId: cid, chainName, caip2, verified: false, reason: "Balance non-zero but tokenId not found. Call POST /v2/passport/identity/confirm-mint" };
+
+      const ownedTokens = [];
+      for (const tid of tokenIds) {
+        try {
+          const owner = await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "ownerOf", args: [BigInt(tid)] });
+          if (owner.toLowerCase() === wallet.toLowerCase()) {
+            const uri = await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "tokenURI", args: [BigInt(tid)] });
+            ownedTokens.push({ tokenId: tid, metadataURI: uri });
+          }
+        } catch { /* skip */ }
+      }
+      if (ownedTokens.length === 0) return { chainId: cid, chainName, caip2, verified: false, reason: "Tokens transferred away" };
+      return { chainId: cid, chainName, caip2, verified: true, tokenId: ownedTokens[0].tokenId, tokenIds: ownedTokens.map(t => t.tokenId), wallet, metadataURI: ownedTokens[0].metadataURI, identityCount: ownedTokens.length };
+    } catch (err) { return { chainId: cid, chainName, caip2, verified: false, reason: `Lookup error: ${err.message}` }; }
+  }));
+  return results;
+}
+
 // GET /v2/agents/:address/identity
 app.get("/v2/agents/:address/identity", async (req, res) => {
-  try { res.json(await passportService.getIdentity(req.params.address)); }
-  catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const identities = await resolveWalletIdentity(req.params.address);
+    const verified = identities.some(i => i.verified);
+    res.json({
+      wallet: req.params.address,
+      identities,
+      primaryIdentity: identities.find(i => i.verified) || null,
+      hasArcIdentity:  identities.some(i => i.chainId === 5042002 && i.verified),
+      hasRhIdentity:   identities.some(i => i.chainId === 46630   && i.verified),
+      identityCount:   identities.reduce((s, i) => s + (i.identityCount || (i.verified ? 1 : 0)), 0),
+      verified,
+      verifiedChains:  identities.filter(i => i.verified).map(i => i.caip2),
+      erc8004Registries: {
+        testnet: {
+          identityRegistry:   "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+          reputationRegistry: "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+          validationRegistry: "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
+        }
+      }
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /v2/agents/:address/capabilities
@@ -1610,133 +1692,47 @@ app.post("/v2/passport/identity/confirm-mint", async (req, res) => {
 });
 
 // POST /v2/passport/identity/verify
-// Resolves the onchain identity for a wallet across Arc Testnet and Robinhood Chain Testnet.
-// Returns verified identity records, chain coverage, and passport store links.
 app.post("/v2/passport/identity/verify", async (req, res) => {
   const { wallet, agentId, chainId } = req.body;
+  if (!wallet && agentId === undefined) return res.status(400).json({ error: "wallet or agentId is required" });
 
-  if (!wallet && agentId === undefined) {
-    return res.status(400).json({ error: "wallet or agentId is required" });
+  // agentId-specific lookup: read ownerOf directly
+  if (agentId !== undefined) {
+    const VERIFY_ABI = parseAbi(["function ownerOf(uint256 tokenId) view returns (address)","function tokenURI(uint256 tokenId) view returns (string)"]);
+    const chains = chainId ? [Number(chainId)] : [5042002, 46630];
+    try {
+      const results = await Promise.all(chains.map(async (cid) => {
+        const client = cid === 46630 ? getRhPassportClient() : publicClient;
+        const chainName = cid === 46630 ? "Robinhood Chain Testnet" : "Arc Testnet";
+        const caip2 = `eip155:${cid}`;
+        try {
+          const [owner, uri] = await Promise.all([
+            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "ownerOf", args: [BigInt(agentId)] }),
+            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "tokenURI", args: [BigInt(agentId)] }),
+          ]);
+          const matches = wallet ? owner.toLowerCase() === wallet.toLowerCase() : true;
+          return { chainId: cid, chainName, caip2, tokenId: Number(agentId), wallet: owner, metadataURI: uri, verified: true, walletMatches: matches };
+        } catch (err) { return { chainId: cid, chainName, caip2, verified: false, reason: err.message }; }
+      }));
+      const verifiedChains = results.filter(r => r.verified).map(r => r.caip2);
+      return res.json({ wallet: wallet||null, agentId: Number(agentId), verified: verifiedChains.length>0, verifiedChains, chainsChecked: chains.map(c=>`eip155:${c}`), identities: results, registryAddress: ERC8004_IDENTITY_REGISTRY, registryNote: "Same contract address on Arc Testnet and Robinhood Chain Testnet (CREATE2 deterministic)", mintEndpoint: "POST /v2/passport/identity/prepare-mint" });
+    } catch (err) { return res.status(500).json({ error: err.message }); }
   }
 
-  const VERIFY_ABI = parseAbi([
-    "function ownerOf(uint256 tokenId) view returns (address)",
-    "function tokenURI(uint256 tokenId) view returns (string)",
-    "function balanceOf(address owner) view returns (uint256)",
-  ]);
+  // wallet-only lookup: use shared resolveWalletIdentity helper
+  try {
+    const chains = chainId ? [Number(chainId)] : [5042002, 46630];
+    const identities = await resolveWalletIdentity(wallet, chains);
+    const verifiedChains = identities.filter(r => r.verified).map(r => r.caip2);
+    return res.json({
+      wallet, agentId: null, verified: verifiedChains.length > 0, verifiedChains,
+      chainsChecked: chains.map(c => `eip155:${c}`), identities,
+      registryAddress: ERC8004_IDENTITY_REGISTRY,
+      registryNote: "Same contract address on Arc Testnet and Robinhood Chain Testnet (CREATE2 deterministic)",
+      mintEndpoint: "POST /v2/passport/identity/prepare-mint",
+    });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 
-  // ERC-721 Transfer event: Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
-  const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-
-  const chains = chainId
-    ? [Number(chainId)]
-    : [5042002, 46630];
-
-  const results = await Promise.all(chains.map(async (cid) => {
-    const client = cid === 46630 ? getRhPassportClient() : publicClient;
-    const chainName = cid === 46630 ? "Robinhood Chain Testnet" : "Arc Testnet";
-    const caip2 = `eip155:${cid}`;
-    const rpcUrl = cid === 46630
-      ? (process.env.RH_TESTNET_RPC || "https://rpc.testnet.chain.robinhood.com")
-      : (process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io");
-
-    try {
-      if (agentId !== undefined) {
-        // Resolve by specific tokenId
-        const [owner, uri] = await Promise.all([
-          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "ownerOf", args: [BigInt(agentId)] }),
-          client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "tokenURI", args: [BigInt(agentId)] }),
-        ]);
-        const matches = wallet ? owner.toLowerCase() === wallet.toLowerCase() : true;
-        return { chainId: cid, chainName, caip2, tokenId: Number(agentId), wallet: owner, metadataURI: uri, verified: true, walletMatches: matches };
-      } else {
-        // Check balance first
-        const balance = await client.readContract({
-          address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "balanceOf", args: [wallet],
-        });
-        if (Number(balance) === 0) {
-          return { chainId: cid, chainName, caip2, verified: false, reason: "No identity found for this wallet on this chain. Mint via POST /v2/passport/identity/prepare-mint" };
-        }
-
-        // Scan Transfer events to wallet in batches to find tokenIds
-        const latestHex = await fetch(rpcUrl, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", method: "eth_blockNumber", params: [], id: 1 }),
-        }).then(r => r.json()).then(r => r.result);
-        const latest = parseInt(latestHex, 16);
-        const BATCH = 4999;
-        const walletPadded = "0x" + "0".repeat(24) + wallet.slice(2).toLowerCase();
-        let tokenIds = [];
-        // Scan last 500k blocks in batches (tokens minted recently)
-        for (let end = latest; end > Math.max(0, latest - 2000000) && tokenIds.length < 20; end -= BATCH) {
-          const from = Math.max(0, end - BATCH);
-          const logsRes = await fetch(rpcUrl, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jsonrpc: "2.0", method: "eth_getLogs", id: 1,
-              params: [{ address: ERC8004_IDENTITY_REGISTRY, topics: [TRANSFER_TOPIC, null, walletPadded], fromBlock: "0x" + from.toString(16), toBlock: "0x" + end.toString(16) }],
-            }),
-          }).then(r => r.json());
-          const logs = logsRes.result || [];
-          for (const log of logs) {
-            const tid = parseInt(log.topics[3], 16);
-            if (!tokenIds.includes(tid)) tokenIds.push(tid);
-          }
-          if (tokenIds.length >= Number(balance)) break;
-        }
-
-        if (tokenIds.length === 0) {
-          // Fall back to passport store (populated by confirm-mint)
-          const stored = passportStore.getIdentityLinks(wallet);
-          const link = stored?.find(l => l.caip2 === caip2);
-          if (link?.tokenId) tokenIds.push(link.tokenId);
-        }
-        if (tokenIds.length === 0) {
-          return { chainId: cid, chainName, caip2, verified: false, reason: "Balance is non-zero but tokenId not found. Call POST /v2/passport/identity/confirm-mint with your mint txHash to register." };
-        }
-
-        // Verify current ownership and get metadata for first token
-        const ownedTokens = [];
-        for (const tid of tokenIds) {
-          try {
-            const owner = await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "ownerOf", args: [BigInt(tid)] });
-            if (owner.toLowerCase() === wallet.toLowerCase()) {
-              const uri = await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "tokenURI", args: [BigInt(tid)] });
-              ownedTokens.push({ tokenId: tid, metadataURI: uri });
-            }
-          } catch { /* skip */ }
-        }
-
-        if (ownedTokens.length === 0) {
-          return { chainId: cid, chainName, caip2, verified: false, reason: "Tokens transferred away — wallet no longer holds any identity tokens." };
-        }
-
-        return {
-          chainId: cid, chainName, caip2, verified: true,
-          tokenId: ownedTokens[0].tokenId,
-          tokenIds: ownedTokens.map(t => t.tokenId),
-          wallet,
-          metadataURI: ownedTokens[0].metadataURI,
-          identityCount: ownedTokens.length,
-        };
-      }
-    } catch (err) {
-      return { chainId: cid, chainName, caip2, verified: false, reason: `Lookup error: ${err.message}` };
-    }
-  }));
-
-  const verifiedChains = results.filter(r => r.verified).map(r => r.caip2);
-  return res.json({
-    wallet:         wallet || null,
-    agentId:        agentId !== undefined ? Number(agentId) : null,
-    verified:       verifiedChains.length > 0,
-    verifiedChains,
-    chainsChecked:  chains.map(c => `eip155:${c}`),
-    identities:     results,
-    registryAddress: ERC8004_IDENTITY_REGISTRY,
-    registryNote:   "Same contract address on Arc Testnet and Robinhood Chain Testnet (CREATE2 deterministic)",
-    mintEndpoint:   "POST /v2/passport/identity/prepare-mint",
-  });
 });
 
 // POST /v2/passport/policy/prepare-commit
