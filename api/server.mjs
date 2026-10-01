@@ -2005,6 +2005,28 @@ app.get("/v2/test/debug-draw", async (req, res) => {
   }
 });
 
+// Debug: manually trigger indexer and return result
+app.get("/v1/activity/debug", async (req, res) => {
+  try {
+    const latest = await publicClient.getBlockNumber();
+    const fromBlock = latest - 100000n;
+    const logs = await publicClient.getLogs({
+      address: CONTRACTS.financing,
+      fromBlock,
+      toBlock: latest,
+    });
+    const drawnLogs = await publicClient.getLogs({
+      address: CONTRACTS.financing,
+      event: parseAbi(["event Drawn(uint256 indexed jobId, address indexed agent, uint256 principal, uint256 fee, address pool, uint8 tier, uint8 repayMode)"])[0],
+      fromBlock,
+      toBlock: latest,
+    }).catch(e => ({ error: e.message }));
+    res.json({ latest: latest.toString(), fromBlock: fromBlock.toString(), allLogs: logs.length, drawnLogs: Array.isArray(drawnLogs) ? drawnLogs.length : drawnLogs, cache: { total: eventCache.events.length, lastBlock: eventCache.lastBlock?.toString(), updatedAt: eventCache.updatedAt } });
+  } catch (e) {
+    res.json({ error: e.message, stack: e.stack?.slice(0,500) });
+  }
+});
+
 // GET /v1/activity — recent protocol events (must be before 404 handler)
 app.get("/v1/activity", (req, res) => {
   res.setHeader("Cache-Control", "no-store, max-age=0");
@@ -2133,28 +2155,7 @@ async function refreshEventIndex() {
 refreshEventIndex();
 setInterval(refreshEventIndex, 5 * 60 * 1000);
 
-// Debug: manually trigger indexer and return result
-app.get("/v1/activity/debug", async (req, res) => {
-  try {
-    const latest = await publicClient.getBlockNumber();
-    const fromBlock = latest - 100000n;
-    const logs = await publicClient.getLogs({
-      address: CONTRACTS.financing,
-      fromBlock,
-      toBlock: latest,
-    });
-    // Also try with each event separately
-    const drawnLogs = await publicClient.getLogs({
-      address: CONTRACTS.financing,
-      event: parseAbi(["event Drawn(uint256 indexed jobId, address indexed agent, uint256 principal, uint256 fee, address pool, uint8 tier, uint8 repayMode)"])[0],
-      fromBlock,
-      toBlock: latest,
-    }).catch(e => ({ error: e.message }));
-    res.json({ latest: latest.toString(), fromBlock: fromBlock.toString(), allLogs: logs.length, drawnLogs: Array.isArray(drawnLogs) ? drawnLogs.length : drawnLogs, cache: eventCache });
-  } catch (e) {
-    res.json({ error: e.message, stack: e.stack?.slice(0,500) });
-  }
-});
+
 
 app.listen(PORT, () => {
   console.log(`Averis V2 API running on port ${PORT}`);
