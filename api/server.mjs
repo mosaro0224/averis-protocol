@@ -1823,8 +1823,8 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
 
     // Step 2b: fund CLIENT wallet with USDC for job budget
     // On Arc, USDC is native — use sendTransaction with value (native transfer, 18 decimals)
-    const jobBudget = 10_000_000n; // 10 USDC (6 decimals) for ERC-20 amounts
-    const nativeAmount = jobBudget * 1_000_000_000_000n; // convert 6-decimal to 18-decimal native (10 USDC)
+    const jobBudget = 5_000_000n; // 5 USDC (6 decimals) — small to leave room for gas across both wallets
+    const nativeAmount = jobBudget * 1_000_000_000_000n; // convert 6-decimal to 18-decimal native (5 USDC)
     const fundClientTx = await wc.sendTransaction({ to: CLIENT, value: nativeAmount, gas: 21000n }); // send exactly 20 native USDC
     await waitTx(fundClientTx);
     steps.push({ step: "2b", name: "Funded client wallet", client: CLIENT, nativeAmount: nativeAmount.toString() });
