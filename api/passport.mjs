@@ -97,35 +97,39 @@ export async function getIdentity(wallet) {
   const links = store.getIdentityLinks(wallet);
   const adapters = getAllAdapters();
 
-  // For any adapter without a stored link, try scanning onchain via balanceOf + Registered events
-  const IDENTITY_FULL_ABI = parseAbi([
-    "function balanceOf(address owner) view returns (uint256)",
-    "event Registered(uint256 indexed agentId, address indexed wallet, string metadataURI)",
-  ]);
+  // For any adapter without a stored link, scan onchain via ERC-721 Transfer events (mints = from 0x0)
   await Promise.all(adapters.map(async adapter => {
     if (links.find(l => l.caip2 === adapter.caip2)) return; // already stored
     try {
-      // Use the adapter's client via its chain config
       const registryAddr = adapter.identityRegistry;
       if (!registryAddr) return;
-      // Scan last 200k blocks for Registered events for this wallet
       let client;
       if (adapter.caip2 === "eip155:5042002") client = getArcClient();
       else if (adapter.caip2 === "eip155:46630") client = getRhClient();
       else return;
       const latest = await client.getBlockNumber();
-      const from = latest > 200000n ? latest - 200000n : 0n;
-      const logs = await client.getLogs({
-        address: registryAddr,
-        event: parseAbi(["event Registered(uint256 indexed agentId, address indexed wallet, string metadataURI)"])[0],
-        args: { wallet: wallet },
-        fromBlock: from,
-        toBlock: latest,
-      }).catch(() => []);
-      for (const log of logs) {
-        const agentId = Number(log.args.agentId);
-        store.addIdentityLink(wallet, { agentId, caip2: adapter.caip2, metadataURI: log.args.metadataURI });
-        links.push({ agentId, caip2: adapter.caip2 });
+      const from = latest > 500000n ? latest - 500000n : 0n;
+      // ERC-721 Transfer: from=0x0 (mint), to=wallet, tokenId=agentId
+      const ZERO = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      const walletPadded = "0x000000000000000000000000" + wallet.toLowerCase().slice(2);
+      const rpc = adapter.caip2 === "eip155:5042002"
+        ? (process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io")
+        : (process.env.RH_TESTNET_RPC || "https://rpc.testnet.chain.robinhood.com");
+      const resp = await fetch(rpc, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{
+          address: registryAddr,
+          topics: ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef", ZERO, walletPadded],
+          fromBlock: "0x" + from.toString(16),
+          toBlock: "latest",
+        }]}),
+      }).then(r => r.json()).catch(() => ({ result: [] }));
+      for (const log of (resp.result || [])) {
+        const agentId = parseInt(log.topics[3], 16);
+        if (!links.find(l => l.caip2 === adapter.caip2 && l.agentId === agentId)) {
+          store.addIdentityLink(wallet, { agentId, caip2: adapter.caip2 });
+          links.push({ agentId, caip2: adapter.caip2 });
+        }
       }
     } catch { /* silent fallback */ }
   }));
