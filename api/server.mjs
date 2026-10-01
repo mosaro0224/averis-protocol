@@ -2119,12 +2119,10 @@ async function refreshEventIndex() {
     const newEvents = [];
     for (let from = fromBlock; from <= latest; from += chunkSize) {
       const to = from + chunkSize - 1n < latest ? from + chunkSize - 1n : latest;
-      const logs = await publicClient.getLogs({
-        address: CONTRACTS.financing,
-        events: EVENT_ABI,
-        fromBlock: from,
-        toBlock: to,
-      });
+      // Fetch each event type separately — viem getLogs with events[] array may drop results
+      const logs = (await Promise.all(
+        EVENT_ABI.map(ev => publicClient.getLogs({ address: CONTRACTS.financing, event: ev, fromBlock: from, toBlock: to }).catch(() => []))
+      )).flat();
       for (const log of logs) {
         const jobIdStr = log.args.jobId?.toString();
         // Track agent by jobId from Drawn events
