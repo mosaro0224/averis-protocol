@@ -42,7 +42,7 @@ export function Agents() {
             <div className="bg-averis-bg p-3">
               <div className="font-mono text-[9px] text-averis-muted mb-1">CREDIT LIMIT</div>
               <div className="font-display text-[18px] font-semibold text-averis-text">
-                {elig ? `$${Number(elig.creditLimit ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                {elig ? `$${(Number(BigInt(elig.credit?.limit ?? 0)) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
               </div>
             </div>
             <div className="bg-averis-bg p-3">
@@ -54,13 +54,13 @@ export function Agents() {
             <div className="bg-averis-bg p-3">
               <div className="font-mono text-[9px] text-averis-muted mb-1">ACTIVE POSITIONS</div>
               <div className="font-display text-[18px] font-semibold text-averis-text">
-                {elig ? `${elig.activePositions ?? 0} / ${elig.maxPositions ?? 5}` : '—'}
+                {elig ? `${elig.jobs?.active ?? 0} / ${elig.jobs?.maxAllowed ?? 5}` : '—'}
               </div>
             </div>
             <div className="bg-averis-bg p-3">
               <div className="font-mono text-[9px] text-averis-muted mb-1">AVAILABLE CREDIT</div>
               <div className="font-display text-[18px] font-semibold text-averis-text">
-                {elig ? `$${Number(elig.availableCredit ?? elig.creditLimit ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                {elig ? `$${(Number(BigInt(elig.credit?.available ?? 0)) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
               </div>
             </div>
           </div>
