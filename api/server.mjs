@@ -2035,10 +2035,13 @@ app.get("/v1/activity", (req, res) => {
   let events = [...eventCache.events].reverse(); // newest first
   if (agent) events = events.filter(e => e.agent?.toLowerCase() === agent);
   res.json({
-    events: events.slice(0, limit),
+    events: events.slice(0, limit).map(e => ({ ...e, type: e.type ?? e.event ?? "UNKNOWN" })),
     total: eventCache.events.length,
     last_indexed_block: eventCache.lastBlock?.toString(),
     updated_at: eventCache.updatedAt,
+    drawn_count: eventCache.events.filter(e => (e.type||e.event) === "Drawn").length,
+    repaid_count: eventCache.events.filter(e => (e.type||e.event) === "Repaid").length,
+    default_count: eventCache.events.filter(e => (e.type||e.event) === "Defaulted").length,
   });
 });
 
