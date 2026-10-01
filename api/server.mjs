@@ -1313,7 +1313,14 @@ app.get("/v2/agents/:address/economic-profile", async (req, res) => {
 
 // Shared helper: resolve onchain identity for a wallet across Arc + RH Testnet
 // Reused by GET /v2/agents/:address/identity and POST /v2/passport/identity/verify
+// Identity cache: wallet -> { results, expires }
+const _identityCache = new Map();
+const IDENTITY_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 async function resolveWalletIdentity(wallet, chainIds = [5042002, 46630]) {
+  const cacheKey = wallet.toLowerCase() + ':' + chainIds.join(',');
+  const cached = _identityCache.get(cacheKey);
+  if (cached && Date.now() < cached.expires) return cached.results;
   const VERIFY_ABI = parseAbi([
     "function ownerOf(uint256 tokenId) view returns (address)",
     "function tokenURI(uint256 tokenId) view returns (string)",
@@ -1345,7 +1352,7 @@ async function resolveWalletIdentity(wallet, chainIds = [5042002, 46630]) {
         const latest = parseInt(latestHex, 16);
         const BATCH = 4999;
         const walletPadded = "0x" + "0".repeat(24) + wallet.slice(2).toLowerCase();
-        for (let end = latest; end > Math.max(0, latest - 2000000) && tokenIds.length < 20; end -= BATCH) {
+        for (let end = latest; end > Math.max(0, latest - 500000) && tokenIds.length < 20; end -= BATCH) {
           const from = Math.max(0, end - BATCH);
           const logsRes = await fetch(rpcUrl, { method:"POST", headers:{"Content-Type":"application/json"},
             body: JSON.stringify({jsonrpc:"2.0",method:"eth_getLogs",id:1,params:[{address:ERC8004_IDENTITY_REGISTRY,
@@ -1371,6 +1378,7 @@ async function resolveWalletIdentity(wallet, chainIds = [5042002, 46630]) {
       return { chainId: cid, chainName, caip2, verified: true, tokenId: ownedTokens[0].tokenId, tokenIds: ownedTokens.map(t => t.tokenId), wallet, metadataURI: ownedTokens[0].metadataURI, identityCount: ownedTokens.length };
     } catch (err) { return { chainId: cid, chainName, caip2, verified: false, reason: `Lookup error: ${err.message}` }; }
   }));
+  _identityCache.set(cacheKey, { results, expires: Date.now() + IDENTITY_TTL_MS });
   return results;
 }
 

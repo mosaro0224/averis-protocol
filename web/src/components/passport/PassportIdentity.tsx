@@ -31,7 +31,7 @@ export function PassportIdentity({ address }: Props) {
                 )}
               </div>
               <div className="grid grid-cols-1 gap-2">
-                <Row label="Agent ID"  value={String(data.primaryIdentity.agentId)} />
+                <Row label="Agent ID"  value={String(data.primaryIdentity.tokenId ?? data.primaryIdentity.agentId ?? 'N/A')} />
                 <Row label="Wallet"    value={data.primaryIdentity.wallet} mono />
                 <Row label="Chain"     value={data.primaryIdentity.caip2} />
                 <Row label="Registry" value={data.primaryIdentity.registryAddress} mono />
@@ -65,7 +65,10 @@ export function PassportIdentity({ address }: Props) {
                       {id.verified ? 'VERIFIED' : 'UNVERIFIED'}
                     </span>
                   </div>
-                  <Row label="Agent ID" value={String(id.agentId)} />
+                  <Row label="Agent ID" value={String(id.tokenId ?? id.agentId ?? 'N/A')} />
+                  {(id.tokenIds?.length ?? 0) > 1 && (
+                    <Row label="All Token IDs" value={(id.tokenIds ?? []).join(', ')} />
+                  )}
                   <Row label="Chain"    value={id.caip2} />
                 </div>
               ))}
