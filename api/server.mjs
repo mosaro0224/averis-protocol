@@ -2082,9 +2082,6 @@ const EVENT_ABI = parseAbi([
   "event Defaulted(uint256 indexed jobId, uint8 status, uint256 principalLoss)",
 ]);
 
-// AverisFinancingV2 deployment block — scan from here on first run so draws are never missed
-const FINANCING_DEPLOY_BLOCK = 64600000n;
-
 let eventCache = { events: [], lastBlock: 0n, updatedAt: null };
 const jobAgentMap = {}; // jobId -> agent address (populated from Drawn events)
 
@@ -2093,10 +2090,10 @@ async function refreshEventIndex() {
     const latest = await publicClient.getBlockNumber();
     const fromBlock = eventCache.lastBlock > 0n
       ? eventCache.lastBlock + 1n
-      : FINANCING_DEPLOY_BLOCK; // always scan from deploy block on first run
+      : (latest > 500000n ? latest - 500000n : 0n); // scan last 500k blocks on first run
     if (fromBlock > latest) return;
 
-    const chunkSize = 2000n;
+    const chunkSize = 9000n;
     const newEvents = [];
     for (let from = fromBlock; from <= latest; from += chunkSize) {
       const to = from + chunkSize - 1n < latest ? from + chunkSize - 1n : latest;
