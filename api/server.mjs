@@ -1365,11 +1365,45 @@ app.post("/v2/agents/:address/agreements", (req, res) => {
 // GET /v2/agents/:address/transactions
 app.get("/v2/agents/:address/transactions", (req, res) => {
   const { type, status, counterparty, limit, offset } = req.query;
-  res.json(passportStore.getTransactions(req.params.address, {
-    type, status, counterparty,
-    limit:  limit  ? parseInt(limit)  : 50,
-    offset: offset ? parseInt(offset) : 0,
-  }));
+  const lim    = limit  ? parseInt(limit)  : 50;
+  const off    = offset ? parseInt(offset) : 0;
+  const wallet = req.params.address.toLowerCase();
+
+  // Merge passport-store transactions with live onchain events from event cache
+  const storeData = passportStore.getTransactions(req.params.address, { type, status, counterparty, limit: 500, offset: 0 });
+
+  // Map onchain events to transaction shape
+  const onchainTxs = eventCache.events
+    .filter(e => e.agent?.toLowerCase() === wallet)
+    .map(e => ({
+      id:          `onchain_${e.tx}_${e.event}`,
+      type:        e.event === "Drawn" ? "FINANCING" : e.event === "Repaid" ? "CREDIT_REPAYMENT" : "DEFAULT",
+      status:      e.event === "Drawn" ? "active" : e.event === "Repaid" ? "completed" : "failed",
+      amount:      (Number(BigInt(e.amount || 0)) / 1e6).toFixed(2) + " USDC",
+      jobId:       e.jobId,
+      txHash:      e.tx,
+      block:       e.block,
+      timestamp:   null, // block timestamp not cached — use block number for ordering
+      source:      "onchain",
+    }));
+
+  // Merge, deduplicate by txHash, sort newest block first
+  const merged = [...storeData.items, ...onchainTxs]
+    .filter((tx, idx, arr) => !tx.txHash || arr.findIndex(t => t.txHash === tx.txHash && t.type === tx.type) === idx);
+
+  // Apply type/status filters
+  let filtered = merged;
+  if (type)   filtered = filtered.filter(t => t.type === type);
+  if (status) filtered = filtered.filter(t => t.status === status);
+
+  // Sort by block desc, then by id desc
+  filtered.sort((a, b) => {
+    const ba = BigInt(a.block || 0), bb = BigInt(b.block || 0);
+    if (bb !== ba) return bb > ba ? 1 : -1;
+    return (b.id > a.id ? 1 : -1);
+  });
+
+  res.json({ total: filtered.length, items: filtered.slice(off, off + lim), indexed_at: eventCache.updatedAt });
 });
 
 // POST /v2/agents/:address/transactions — record a transaction
