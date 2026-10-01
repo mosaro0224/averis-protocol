@@ -117,7 +117,7 @@ const POOL_ABI = parseAbi([
 ]);
 
 const REGISTRY_ABI = parseAbi([
-  "function isRegistered(address protocol) view returns (bool)",
+  "function isActive(address protocol, uint256 adapterId) view returns (bool)",
   "function adapters(address protocol) view returns (address adapter, uint8 tier, bool active)",
 ]);
 
@@ -326,7 +326,7 @@ app.post("/v2/jobs/verify", async (req, res) => {
 
   try {
     // Check adapter registration
-    const isRegistered = await readContract(CONTRACTS.registry, REGISTRY_ABI, "isRegistered", [protocol]);
+    const isRegistered = await readContract(CONTRACTS.registry, REGISTRY_ABI, "isActive", [protocol, 0n]).catch(() => false);
 
     let jobView = null;
     let warnings = [];
@@ -685,10 +685,10 @@ app.get("/v2/hood/status", async (req, res) => {
 app.get("/v2/registry/:protocol", async (req, res) => {
   if (!requireContracts(res)) return;
   try {
-    const isRegistered = await readContract(CONTRACTS.registry, REGISTRY_ABI, "isRegistered", [req.params.protocol]);
+    const isRegistered = await readContract(CONTRACTS.registry, REGISTRY_ABI, "isActive", [req.params.protocol, 0n]).catch(() => false);
     let adapterInfo = null;
     if (isRegistered) {
-      const raw = await readContract(CONTRACTS.registry, REGISTRY_ABI, "adapters", [req.params.protocol]);
+      const raw = await readContract(CONTRACTS.registry, REGISTRY_ABI, "adapters", [req.params.protocol]).catch(() => null);
       const TIER_NAMES = ["NATIVE", "VERIFIED", "ATTESTED"];
       adapterInfo = {
         adapter:  raw[0],
@@ -1807,7 +1807,7 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     "function balanceOf(address) view returns (uint256)",
   ]);
   const FINANCING_ABI_LOCAL = parseAbi([
-    "function draw(uint256 jobId, uint256 amount, address adapter, bytes32 termsHash) returns (address pool)",
+    "function draw(address protocol, uint256 adapterId, uint256 jobId, uint128 amount, bytes obligationSig, address[] recipients) external",
   ]);
 
   const steps = [];
@@ -1897,7 +1897,13 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
     steps.push({ step: 5, name: "Quote", drawAmount: drawAmount.toString(), repayment: quoteRes.totalRepayment || quoteRes.total_repayment, termsHash });
 
     // Step 6: draw onchain
-    const drawTx = await wc.writeContract({ address: CONTRACTS.financing, abi: FINANCING_ABI_LOCAL, functionName: "draw", args: [jobId, drawAmount, CONTRACTS.acp, termsHash], gas: 600000n });
+    // draw(protocol, adapterId, jobId, amount, obligationSig, recipients)
+    // LIEN mode: obligationSig = empty bytes, recipients = empty array (pool handles routing)
+    const drawTx = await wc.writeContract({
+      address: CONTRACTS.financing, abi: FINANCING_ABI_LOCAL, functionName: "draw",
+      args: [CONTRACTS.acp, 0n, jobId, BigInt(drawAmount), "0x", []],
+      gas: 600000n
+    });
     const drawRcpt = await waitTx(drawTx);
     steps.push({ step: 6, name: "Draw confirmed", drawTx, drawAmount: drawAmount.toString(), gasUsed: drawRcpt.gasUsed.toString() });
 
