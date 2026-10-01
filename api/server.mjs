@@ -81,7 +81,7 @@ const VAULT_ABI = parseAbi([
 ]);
 
 const FINANCING_ABI = parseAbi([
-  "function positions(uint256 jobId) view returns (address agent, uint96 principal, uint96 fee, uint96 principalRepaid, uint96 feeRepaid, uint8 status, uint256 expiry, address poolAddress, uint8 mode)",
+  "function getPosition(uint256 jobId) view returns (address agent, address poolAddress, uint128 principal, uint128 fee, uint128 principalRepaid, uint128 feeRepaid, uint64 expiry, uint8 status, uint8 tier, uint8 repayMode)",
   "function maxAdvance(address protocol, uint256 jobId, uint256 amount) view returns (uint256)",
   "function creditLimits(address agent) view returns (uint128)",
   "function advanceRateBps() view returns (uint256)",
@@ -440,8 +440,8 @@ app.post("/v2/credit/quote", async (req, res) => {
 app.get("/v2/positions/:jobId", async (req, res) => {
   if (!requireContracts(res)) return;
   try {
-    const pos = await readContract(CONTRACTS.financing, FINANCING_ABI, "positions", [BigInt(req.params.jobId)]);
-    const [agent, principal, fee, principalRepaid, feeRepaid, status, expiry, poolAddress, mode] = pos;
+    const pos = await readContract(CONTRACTS.financing, FINANCING_ABI, "getPosition", [BigInt(req.params.jobId)]);
+    const [agent, poolAddress, principal, fee, principalRepaid, feeRepaid, expiry, status, tier, repayMode] = pos;
 
     const STATUS_NAMES = ["NONE", "ACTIVE", "REPAID", "DEFAULTED", "EXPIRED", "PARTIALLY_RECOVERED"];
     const MODE_NAMES   = ["LIEN", "OBLIGATION"];
