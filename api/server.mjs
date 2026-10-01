@@ -1294,7 +1294,16 @@ app.options("/mcp", (req, res) => {
 app.get("/v2/agents/:address/passport", async (req, res) => {
   res.setHeader("Cache-Control", "no-store, max-age=0");
   try {
-    const profile = await passportService.getEconomicProfile(req.params.address);
+    const wallet = req.params.address.toLowerCase();
+    const [profile, identities] = await Promise.all([
+      passportService.getEconomicProfile(wallet),
+      resolveWalletIdentity(wallet),
+    ]);
+    // Enrich identity with onchain data (store-independent)
+    const primaryIdentity = identities.find(i => i.verified) || null;
+    const identityCount   = identities.reduce((s, i) => s + (i.identityCount || (i.verified ? 1 : 0)), 0);
+    profile.identity = { ...profile.identity, identities, primaryIdentity, identityCount, verified: Boolean(primaryIdentity) };
+    profile.summary  = { ...profile.summary,  hasIdentity: Boolean(primaryIdentity), identityCount };
     res.json(profile);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1362,6 +1371,23 @@ async function resolveWalletIdentity(wallet, chainIds = [5042002, 46630]) {
         }
       }
 
+      // Fallback: probe ownerOf on recent tokenId range (handles RPCs that block eth_getLogs)
+      if (tokenIds.length === 0) {
+        try {
+          // Get totalSupply to bound the search, or probe last 500 tokenIds
+          const PROBE_ABI = parseAbi(["function totalSupply() view returns (uint256)"]);
+          let topId = 1000;
+          try { topId = Number(await client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: PROBE_ABI, functionName: "totalSupply" })); } catch {}
+          const start = Math.max(1, topId - 200);
+          const probes = [];
+          for (let tid = start; tid <= topId; tid++) probes.push(tid);
+          const results2 = await Promise.allSettled(probes.map(tid =>
+            client.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: VERIFY_ABI, functionName: "ownerOf", args: [BigInt(tid)] })
+              .then(owner => owner.toLowerCase() === wallet.toLowerCase() ? tid : null)
+          ));
+          for (const r of results2) { if (r.status === 'fulfilled' && r.value !== null) tokenIds.push(r.value); }
+        } catch {}
+      }
       if (tokenIds.length === 0) return { chainId: cid, chainName, caip2, verified: false, reason: "Balance non-zero but tokenId not found. Call POST /v2/passport/identity/confirm-mint" };
 
       const ownedTokens = [];
