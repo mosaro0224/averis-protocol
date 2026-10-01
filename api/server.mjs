@@ -1917,22 +1917,29 @@ app.post("/v2/test/draw-cycle", async (req, res) => {
   }
 });
 
-// ── Debug: eth_call createJob to get revert reason
-app.get("/v2/test/debug-createjob", async (req, res) => {
+// ── Debug: simulate draw() to get revert reason
+app.get("/v2/test/debug-draw", async (req, res) => {
   if (!process.env.TEST_SECRET || req.headers["x-test-secret"] !== process.env.TEST_SECRET) return res.status(403).json({ error: "Forbidden" });
-  const { createPublicClient, http: viemHttp, parseAbi, encodeFunctionData } = await import("viem");
+  const { createPublicClient, http: viemHttp, parseAbi } = await import("viem");
   const arcChain = { id: 5042002, name: "Arc Testnet", nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 }, rpcUrls: { default: { http: [process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io"] } } };
   const pc = createPublicClient({ chain: arcChain, transport: viemHttp(process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io") });
   const PROVIDER = "0xd02Fe263b6F577b12558dA913027DC432f75CEb9";
-  const CLIENT   = "0x59f5E077e19992b0d362732821b9f6ED2aF83084";
-  const EVALUATOR = CONTRACTS.hood;
-  const expiry = BigInt(Math.floor(Date.now()/1000) + 86400 * 7);
-  const abi = parseAbi(["function createJob(address,address,uint64,string,address) returns (uint256)"]);
+  const jobId = BigInt(req.query.jobId || "3");
+  const amount = BigInt(req.query.amount || "2000000");
+  const abi = parseAbi(["function draw(address protocol, uint256 adapterId, uint256 jobId, uint128 amount, bytes obligationSig, address[] recipients) external"]);
   try {
-    const result = await pc.simulateContract({ address: CONTRACTS.acp, abi, functionName: "createJob", args: [PROVIDER, EVALUATOR, expiry, "Averis draw test", "0x0000000000000000000000000000000000000000"], account: CLIENT });
-    res.json({ success: true, result: result.result?.toString() });
+    const result = await pc.simulateContract({
+      address: CONTRACTS.financing, abi, functionName: "draw",
+      args: [CONTRACTS.acp, 0n, jobId, amount, "0x", []],
+      account: PROVIDER
+    });
+    res.json({ success: true, result: JSON.stringify(result.result) });
   } catch(e) {
-    res.json({ success: false, error: e.message?.split('\n')[0], cause: e.cause?.message?.split('\n')[0] });
+    // Parse out the specific revert error
+    const msg = e.message || '';
+    const revertMatch = msg.match(/reverted with the following reason:\n\s*(.+)/);
+    const customMatch = msg.match(/Error: (\w+)\(\)/);
+    res.json({ success: false, error: msg.split('\n')[0], revertReason: revertMatch?.[1], customError: customMatch?.[1], fullCause: e.cause?.shortMessage });
   }
 });
 
