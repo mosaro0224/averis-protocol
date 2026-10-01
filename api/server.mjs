@@ -91,7 +91,7 @@ const FINANCING_ABI = parseAbi([
 ]);
 
 const ACP_ABI = parseAbi([
-  "function getJob(uint256 id) view returns (address client, address provider, uint128 budget, address token, uint8 status, uint256 expiry, address payoutReceiver, bytes32 descriptionHash)",
+  "function getJob(uint256 jobId) view returns (address client, address provider, address evaluator, address payoutReceiver, address token, uint128 budget, uint128 settledAmount, uint64 expiry, uint8 status)",
 ]);
 
 const HOOD_ABI = parseAbi([
@@ -334,9 +334,9 @@ app.post("/v2/jobs/verify", async (req, res) => {
     if (protocol.toLowerCase() === CONTRACTS.acp?.toLowerCase()) {
       // Native Averis job — read directly
       const job = await readContract(CONTRACTS.acp, ACP_ABI, "getJob", [BigInt(jobId)]);
-      const [client, provider, budget, token, status, expiry, payoutReceiver, descHash] = job;
+      const [client, provider, evaluator, payoutReceiver, token, budget, settledAmount, expiry, status] = job;
       const now = Math.floor(Date.now() / 1000);
-      jobView = { client, provider, budget: budget.toString(), token, status: Number(status), expiry: expiry.toString(), payoutReceiver, descriptionHash: descHash };
+      jobView = { client, provider, evaluator, payoutReceiver, token, budget: budget.toString(), settledAmount: settledAmount.toString(), expiry: expiry.toString(), status: Number(status) };
 
       if (agentAddress && provider.toLowerCase() !== agentAddress.toLowerCase()) warnings.push("Agent is not the job provider");
       if (Number(status) !== 2) warnings.push("Job is not in FUNDED state (status must be 2)");
