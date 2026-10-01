@@ -1977,6 +1977,21 @@ app.get("/v2/test/debug-draw", async (req, res) => {
   }
 });
 
+// GET /v1/activity — recent protocol events (must be before 404 handler)
+app.get("/v1/activity", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  const limit = Math.min(parseInt(req.query.limit ?? "50"), 200);
+  const agent = req.query.agent?.toLowerCase();
+  let events = [...eventCache.events].reverse(); // newest first
+  if (agent) events = events.filter(e => e.agent?.toLowerCase() === agent);
+  res.json({
+    events: events.slice(0, limit),
+    total: eventCache.events.length,
+    last_indexed_block: eventCache.lastBlock?.toString(),
+    updated_at: eventCache.updatedAt,
+  });
+});
+
 // ── 404 handler
 app.use((req, res) => {
   res.status(404).json({
@@ -2084,21 +2099,6 @@ async function refreshEventIndex() {
 // Run on startup and every 5 minutes
 refreshEventIndex();
 setInterval(refreshEventIndex, 5 * 60 * 1000);
-
-// GET /v1/activity — recent protocol events
-app.get("/v1/activity", (req, res) => {
-  res.setHeader("Cache-Control", "no-store, max-age=0");
-  const limit = Math.min(parseInt(req.query.limit ?? "50"), 200);
-  const agent = req.query.agent?.toLowerCase();
-  let events = [...eventCache.events].reverse(); // newest first
-  if (agent) events = events.filter(e => e.agent?.toLowerCase() === agent);
-  res.json({
-    events: events.slice(0, limit),
-    total: eventCache.events.length,
-    last_indexed_block: eventCache.lastBlock?.toString(),
-    updated_at: eventCache.updatedAt,
-  });
-});
 
 app.listen(PORT, () => {
   console.log(`Averis V2 API running on port ${PORT}`);
