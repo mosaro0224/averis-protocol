@@ -35,47 +35,132 @@ export function Landing() {
       <main className="flex-1">
         {/* Hero */}
         <section className="max-w-[1400px] mx-auto px-8 pt-16 pb-24">
-          <div className="flex items-center gap-2 mb-7">
-            <span className="w-[6px] h-[6px] rounded-full bg-averis-green" />
-            <span className="font-mono text-[9px] tracking-[0.18em] text-averis-muted uppercase">
-              On-Chain Working Capital Infrastructure
-            </span>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            {/* Left: copy */}
+            <div>
+              <div className="flex items-center gap-2 mb-7">
+                <span className="w-[6px] h-[6px] rounded-full bg-averis-green" />
+                <span className="font-mono text-[9px] tracking-[0.18em] text-averis-muted uppercase">
+                  On-Chain Working Capital Infrastructure
+                </span>
+              </div>
 
-          <h1 className="font-display font-bold leading-[0.93] tracking-[-0.03em] text-[48px] md:text-[64px] text-averis-text max-w-[700px] mb-8">
-            Working capital<br />
-            <span className="text-averis-green">for autonomous</span><br />
-            AI agents.
-          </h1>
+              <h1 className="font-display font-bold leading-[0.93] tracking-[-0.03em] text-[48px] md:text-[64px] text-averis-text mb-8">
+                Working capital<br />
+                <span className="text-averis-green">for autonomous</span><br />
+                AI agents.
+              </h1>
 
-          <p className="text-[15px] text-averis-muted2 max-w-[480px] mb-4">
-            Averis is two-product infrastructure for the agentic economy.
-            <strong className="text-averis-text font-semibold"> Averis Finance</strong> gives AI agents job-backed working capital.
-            <strong className="text-averis-text font-semibold"> Averis Passport</strong> gives them a verifiable identity and reputation record — onchain, cross-chain, and non-custodial.
-          </p>
-          <p className="text-[14px] text-averis-muted2/80 max-w-[420px] mb-10">
-            Averis Finance is live on Arc Testnet. Averis Passport is live on Arc Testnet and Robinhood Chain Testnet. Agents can draw capital and build a verifiable track record across both chains in the same protocol.
-          </p>
+              <p className="text-[15px] text-averis-muted2 mb-4">
+                Averis is two-product infrastructure for the agentic economy.
+                <strong className="text-averis-text font-semibold"> Averis Finance</strong> gives AI agents job-backed working capital.
+                <strong className="text-averis-text font-semibold"> Averis Passport</strong> gives them a verifiable identity and reputation record — onchain, cross-chain, and non-custodial.
+              </p>
+              <p className="text-[14px] text-averis-muted2/80 mb-10">
+                Live on Arc Testnet and Robinhood Chain Testnet. Agents can draw capital and build a verifiable track record across both chains in the same protocol.
+              </p>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={onLaunchPassport}
-              className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-6 py-3.5 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer"
-            >
-              PASSPORT
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <button
-              onClick={onLaunchApp}
-              className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-6 py-3.5 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer"
-            >
-              FINANCE
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={onLaunchPassport}
+                  className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-6 py-3.5 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer"
+                >
+                  PASSPORT
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={onLaunchApp}
+                  className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] bg-averis-green text-averis-greendark font-bold px-6 py-3.5 hover:bg-[#b3fa99] transition-colors border-0 cursor-pointer"
+                >
+                  FINANCE
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Right: protocol stats card */}
+            <div className="border border-averis-line bg-averis-panel divide-y divide-averis-line">
+              {/* Header */}
+              <div className="px-6 py-4 flex items-center justify-between">
+                <span className="font-mono text-[9px] tracking-[0.18em] text-averis-muted uppercase">Protocol Status</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-averis-green animate-pulse" />
+                  <span className="font-mono text-[9px] text-averis-green">LIVE</span>
+                </span>
+              </div>
+
+              {/* Finance row */}
+              <div className="px-6 py-5">
+                <div className="font-mono text-[9px] tracking-[0.14em] text-averis-green mb-3">AVERIS FINANCE</div>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    ['Advance Rate', '40%'],
+                    ['Financing Fee', '2.00%'],
+                    ['Capital Destination', 'Job Pool'],
+                    ['Repayment', 'Auto via Lien'],
+                  ].map(([label, val]) => (
+                    <div key={label}>
+                      <div className="font-mono text-[9px] text-averis-muted mb-1">{label.toUpperCase()}</div>
+                      <div className="font-mono text-[14px] text-averis-text">{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Passport row */}
+              <div className="px-6 py-5">
+                <div className="font-mono text-[9px] tracking-[0.14em] text-averis-green mb-3">AVERIS PASSPORT</div>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    ['Identity Standard', 'ERC-8004'],
+                    ['Policy Signatures', 'EIP-712'],
+                    ['Chains', 'Arc + RH'],
+                    ['Receipt Storage', 'Append-only'],
+                  ].map(([label, val]) => (
+                    <div key={label}>
+                      <div className="font-mono text-[9px] text-averis-muted mb-1">{label.toUpperCase()}</div>
+                      <div className="font-mono text-[14px] text-averis-text">{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chain status */}
+              <div className="px-6 py-4 grid grid-cols-2 gap-4">
+                {[
+                  ['Arc Testnet', '5042002'],
+                  ['Robinhood Chain Testnet', '46630'],
+                ].map(([name, chainId]) => (
+                  <div key={chainId} className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-averis-green shrink-0" />
+                    <div>
+                      <div className="font-mono text-[10px] text-averis-text">{name}</div>
+                      <div className="font-mono text-[9px] text-averis-muted">Chain {chainId}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA strip */}
+              <div className="px-6 py-4 flex gap-3">
+                <button
+                  onClick={onLaunchPassport}
+                  className="flex-1 font-mono text-[10px] tracking-[0.06em] border border-averis-line text-averis-muted hover:border-averis-green hover:text-averis-green py-2 transition-colors bg-transparent cursor-pointer"
+                >
+                  OPEN PASSPORT →
+                </button>
+                <button
+                  onClick={onLaunchApp}
+                  className="flex-1 font-mono text-[10px] tracking-[0.06em] border border-averis-green text-averis-green hover:bg-averis-green hover:text-averis-greendark py-2 transition-colors bg-transparent cursor-pointer"
+                >
+                  OPEN FINANCE →
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
