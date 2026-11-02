@@ -145,21 +145,7 @@ export function Landing() {
                 ))}
               </div>
 
-              {/* CTA strip */}
-              <div className="px-6 py-4 flex gap-3">
-                <button
-                  onClick={onLaunchPassport}
-                  className="flex-1 font-mono text-[10px] tracking-[0.06em] border border-averis-line text-averis-muted hover:border-averis-green hover:text-averis-green py-2 transition-colors bg-transparent cursor-pointer"
-                >
-                  OPEN PASSPORT →
-                </button>
-                <button
-                  onClick={onLaunchApp}
-                  className="flex-1 font-mono text-[10px] tracking-[0.06em] border border-averis-green text-averis-green hover:bg-averis-green hover:text-averis-greendark py-2 transition-colors bg-transparent cursor-pointer"
-                >
-                  OPEN FINANCE →
-                </button>
-              </div>
+
             </div>
           </div>
         </section>
